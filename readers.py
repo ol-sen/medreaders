@@ -1,6 +1,28 @@
-# Copyright (c) 2019 Olga Senyukova. All rights reserved.
+# Copyright (c) 2020 Olga Senyukova. All rights reserved.
 # License: http://opensource.org/licenses/MIT
+"""
+medreaders --- Readers for medical image datasets
+=================================================
+**Source code:** `readers.py <https://github.com/ol-sen/medreaders/blob/master/readers.py>`_
 
+--------------
+
+The :mod:`readers` module contains the code for reading medical image datasets into memory and for auxiliary tasks:
+    * resize images with ground truth masks by interpolation;
+    * resize images with ground truth masks by cropping and padding;
+    * save images slice by slice to PNG;
+    * save pairs of images and ground truth masks to PNG.
+
+You can specify anatomical structure of interest for loading ground truth masks or load masks with all structures.
+
+You can use functions with default loader or create a custom loader.
+
+In order to use the functions from this repository you should download a dataset that you need from `Grand Challenges in Biomedical Image Analysis <https://grand-challenge.org/challenges/>`_. Currently the repository contains the code for reading `ACDC dataset <https://www.creatis.insa-lyon.fr/Challenge/acdc/index.html>`_.
+
+Functions
+---------
+
+"""
 import os
 import glob
 import numpy as np
@@ -13,6 +35,343 @@ import skimage
 import sklearn
 
 from functools import lru_cache
+
+
+_acdc_readers = {}
+
+class ACDC_Reader:
+    def __init__(self):
+        super().__init__()
+        self.encoder = one_hot_encode
+        self.decoder = one_hot_decode
+        self.images = []
+        self.masks = []
+
+    def set_encoder(self, encode):
+        self.encoder = encode
+
+    def set_decoder(self, decode):
+        self.decoder = decode
+
+    def load(self, data_dir, structure, phase):
+        """
+        Loads ACDC dataset into memory (the dataset can be downloaded from https://www.creatis.insa-lyon.fr/Challenge/acdc/index.html).
+
+        :param str data_dir: path to "training" directory
+        :param str structure: anatomical structure of interest: right ventricle ("RV"), myocardium ("MYO"), left ventricle ("LV") or all structures ("all")
+        :param str phase: end diastole ("ED"), end systole ("ES") or both phases ("both")
+        :raises ValueError: if *mask* or *phase* parameters are incorrrect 
+        :raises EnvironmentError: if the directory specified by *data_dir* parameter does not contain patient images 
+         
+        Example:
+
+        .. code-block:: python
+           
+            custom_ACDC_Reader = readers.ACDC_Reader()
+            custom_ACDC_Reader.set_encoder(readers.identity())
+            custom_ACDC_Reader.set_decoder(readers.identity())
+            custom_ACDC_Reader.load("../ACDC/training", "all", "ED")
+        """
+        if structure not in ["RV", "MYO", "LV", "all"]:
+            raise ValueError("Incorrect 'mask' parameter in function 'load'. Expected values: 'RV', 'MYO', 'LV', 'all'.")
+        if phase not in ["ED", "ES", "both"]:
+            raise ValueError("Incorrect 'phase' parameter in function 'load'. Expected values: 'ED', 'ES', 'both'.")
+        logging.info("Loading ACDC dataset...")
+        glob_search = os.path.join(data_dir, "patient*")
+        patient_dirs = sorted(glob.glob(glob_search))
+        if len(patient_dirs) == 0:
+            raise EnvironmentError("Loading ACDC failed. No patient directories were found in {}.".format(data_dir))
+        del patient_dirs[1] # remove file patient001.Info.cfg from patient directories list
+        self.images = [f for i in patient_dirs for f in load_patient_images(i, phase)]
+        self.masks = [f for i in patient_dirs for f in self._load_patient_masks(i, structure, phase)]
+        logging.info("ACDC dataset has been loaded successfully.")
+         
+    def resize(self, new_height, new_width, interpolate = True):
+        """
+        Resizes images according with their ground truth masks to (new_height, new_width). If *interpolate* parameter is set to **True**, bilinear interpolation for images and nearest neighbor interpolation for masks is used. Otherwise central cropping and/or zero padding is used for images and masks.
+
+        :param new_height: height (in pixels) of output images and masks
+        :type new_height: integer
+        :param new_width: width (in pixels) of output images and masks
+        :type new_width: integer
+        :param interpolate: whether to use interpolation or cropping/padding
+        :type interpolate: bool
+        
+        Example:
+
+        .. code-block:: python
+            
+            custom_ACDC_Reader = readers.ACDC_Reader()
+            custom_ACDC_Reader.set_encoder(readers.identity())
+            custom_ACDC_Reader.set_decoder(readers.identity())
+            custom_ACDC_Reader.load("../ACDC/training", "all", "ED")
+            custom_ACDC_Reader.resize(216, 256) 
+        
+        Example:
+
+        .. code-block:: python
+            
+            custom_ACDC_Reader.resize(216, 256, interpolate = False) 
+        """    
+        logging.info("Resizing images with masks...")
+        if interpolate == True:
+            self.images = [resize3D_image(new_height, new_width)(i)
+                for i in self.images] 
+            self.masks = [self._resize3D_mask(new_height, new_width)(m)
+                for m in self.masks]
+        else:
+            self.images = [fit_to_box(new_height, new_width)(i)
+                for i in self.images]
+            self.masks = [self.encoder(fit_to_box(new_height, new_width)(self.decoder(m)))
+                for m in self.masks]         
+        logging.info("The images with masks have been resized successfully to {}x{}.".format(new_height, new_width))
+    
+    def save(self, save_dir_images, save_dir_masks, alpha = 0.5):
+        """
+        Saves original images slice by slice in PNG format to *save_dir_images*. Saves pairs of images and these images overlayed by ground truth masks slice by slice in PNG format to *save_dir_masks*.
+        
+        :param str save_dir_images: path to the directory for saving original images
+        :param std save_dir_masks: path to the directory for saving images with masks
+        :param alpha: the alpha blending value for mask overlay, between 0 (transparent) and 1 (opaque)
+        :type alpha: float
+        
+        Example:
+
+        .. code-block:: python
+            
+            custom_ACDC_Reader = readers.ACDC_Reader()
+            custom_ACDC_Reader.set_encoder(readers.identity())
+            custom_ACDC_Reader.set_decoder(readers.identity())
+            custom_ACDC_Reader.load("../ACDC/training", "all", "ED")
+            custom_ACDC_Reader.save("../PatientImagesOriginal", "../PatientImagesWithMasks")
+        
+        Example:
+
+        .. code-block:: python
+            
+            custom_ACDC_Reader.save("../PatientImagesOriginal", "../PatientImagesWithMasks", alpha = 0.2)
+"""   
+        logging.info("Saving images...")
+        os.mkdir(save_dir_images)
+        for image_ind, image in enumerate(self.images):
+            for slice_ind, slice_image in enumerate(normalize(slicing(image))):
+                imageio.imwrite(
+                    os.path.join(save_dir_images, "image{:03d}_slice{:02d}.png".format(image_ind + 1, slice_ind + 1)),
+                    slice_image)
+        logging.info("The images have been saved successfully to {} directory.".format(save_dir_images))
+        
+        def two_pictures_together_to_plot(image_slice, mask_slice):
+            cmap_image = plt.cm.gray
+            cmap_mask = plt.cm.Set1
+            plt.figure(figsize = (8, 3.75))
+            plt.subplot(1, 2, 1)
+            plt.axis("off")
+            plt.imshow(image_slice, cmap = cmap_image)
+            plt.subplot(1, 2, 2)
+            plt.axis("off")
+            plt.imshow(image_slice, cmap = cmap_image)
+            plt.imshow(mask_slice, cmap = cmap_mask, alpha = alpha) 
+        os.mkdir(save_dir_masks)
+        for image_ind, (image, mask) in enumerate(zip(self.images, self.masks)):
+            for slice_ind, (image_slice, mask_slice) in enumerate(zip(slicing(image), slicing(self.decoder(mask)))):
+                two_pictures_together_to_plot(image_slice, mask_slice)
+                path = os.path.join(save_dir_masks, "image{:03d}_slice{:02d}.png".format(image_ind + 1, slice_ind + 1)) 
+                plt.savefig(path, bbox_inches = 'tight')
+                plt.close()    
+        logging.info("The images with masks have been saved successfully to {} directory.".format(save_dir_masks))
+
+    def _load_patient_masks(self, patient_dir, structure, phase):
+        return ([self.encoder(binarize_mask_if_one_structure(load_nifti_image(f), structure)) 
+                for f in get_frames_paths(patient_dir, phase, create_frame_path_mask)])
+
+    @lru_cache()
+    def _resize3D_mask(self, new_height, new_width):
+        return lambda item: self.encoder(combine3D(
+            map(truncate64,
+            map(resize2D_mask(new_height, new_width),
+                slicing(self.decoder(item))))))
+
+
+def get_ACDC_reader(name):
+    if name not in _acdc_readers:
+        _acdc_readers[name] = ACDC_Reader()
+    return _acdc_readers[name]
+
+
+def set_encoder(encode):
+    _default_ACDC_Reader.set_encoder(encode)
+
+
+def set_decoder(decode):
+    _default_ACDC_Reader.set_decoder(encode)
+
+
+def load(data_dir, structure, phase):
+    """
+    Loads ACDC dataset into memory (the dataset can be downloaded from https://www.creatis.insa-lyon.fr/Challenge/acdc/index.html).
+
+    :param str data_dir: path to "training" directory
+    :param str structure: anatomical structure of interest: right ventricle ("RV"), myocardium ("MYO"), left ventricle ("LV") or all structures ("all")
+    :param str phase: end diastole ("ED"), end systole ("ES") or both phases ("both")
+    :raises ValueError: if *mask* or *phase* parameters are incorrrect 
+    :raises EnvironmentError: if the directory specified by *data_dir* parameter does not contain patient images 
+         
+    Example:
+
+    .. code-block:: python
+           
+        readers.load("../ACDC/training", "all", "ED")
+    """
+    return _default_ACDC_Reader.load(data_dir, structure, phase)
+
+
+def resize(new_height, new_width, interpolate = True):
+    """
+    Resizes images according with their ground truth masks to (new_height, new_width). If *interpolate* parameter is set to **True**, bilinear interpolation for images and nearest neighbor interpolation for masks is used. Otherwise central cropping and/or zero padding is used for images and masks.
+
+    :param new_height: height (in pixels) of output images and masks
+    :type new_height: integer
+    :param new_width: width (in pixels) of output images and masks
+    :type new_width: integer
+    :param interpolate: whether to use interpolation or cropping/padding
+    :type interpolate: bool
+        
+    Example:
+
+    .. code-block:: python
+            
+        readers.resize(216, 256) 
+        
+    Example:
+
+    .. code-block:: python
+            
+        readers.resize(216, 256, interpolate = False) 
+    """
+    return _default_ACDC_Reader.resize(new_height, new_width, interpolate)
+
+
+def save(save_dir_images, save_dir_masks, alpha = 0.5):
+    """
+    Saves original images slice by slice in PNG format to *save_dir_images*. Saves pairs of images and these images overlayed by ground truth masks slice by slice in PNG format to *save_dir_masks*.
+        
+    :param str save_dir_images: path to the directory for saving original images
+    :param std save_dir_masks: path to the directory for saving images with masks
+    :param alpha: the alpha blending value for mask overlay, between 0 (transparent) and 1 (opaque)
+    :type alpha: float
+        
+    Example:
+
+    .. code-block:: python
+            
+        readers.save("../PatientImagesOriginal", "../PatientImagesWithMasks")
+        
+    Example:
+
+    .. code-block:: python
+            
+        readers.save("../PatientImagesOriginal", "../PatientImagesWithMasks", alpha = 0.2)
+"""   
+    return _default_ACDC_Reader.save(save_dir_images, save_dir_masks, alpha)
+
+
+def get_images():
+    """
+    Get patient images.
+
+    :return: images
+    :rtype: list of numpy.ndarrays
+    
+    Example:
+
+    .. code-block:: python
+
+        images = readers.get_images()
+    """
+    return _default_ACDC_Reader.images
+
+
+def get_masks():
+    """
+    Get ground truth masks of patient images.
+
+    :return: ground truth masks
+    :rtype: list of numpy.ndarrays
+    
+    Example:
+
+    .. code-block:: python
+
+        masks = readers.get_masks()
+    """
+    return _default_ACDC_Reader.masks
+
+
+def one_hot_encode(mask):    
+    """
+    Performs one-hot encoding of ground truth mask.
+    
+    :param mask: input mask, each value of which is a class label, a number in range from 0 to *K*-1, where *K* is the total number of classes
+    :type mask: numpy.ndarray
+    :return: one-hot encoded mask
+    :rtype: numpy.ndarray
+    
+    Example:
+
+    .. code-block:: python
+       
+        encoded_mask = readers.one_hot_encode(input_mask)
+    """
+    input_shape = mask.shape
+    mask = mask.ravel()
+    classes = len(set(mask))
+    n = len(mask)
+    mask_encoded = np.zeros((n, classes))
+    mask_encoded[np.arange(n), mask] = 1
+    new_shape = input_shape + (classes,)
+    mask_encoded = np.reshape(mask_encoded, new_shape)
+    return mask_encoded
+
+
+def one_hot_decode(mask):
+    """
+    Performs one-hot decoding of ground truth mask.
+    
+    :param mask: input mask, one-hot encoded
+    :type mask: numpy.ndarray
+    :return: output mask, each value of which is a class label, a number in range from 0 to *K*-1, where *K* is the total number of classes
+    :rtype: numpy.ndarray
+    
+    Example:
+
+    .. code-block:: python
+       
+        decoded_mask = readers.one_hot_decode(encoded_mask)
+    """
+    return mask.argmax(3)
+
+
+def identity(mask):
+    """
+    This is identity function that can be used as an argument of functions :func:`set_encoder` and :func:`set_decoder`.
+    
+    :param mask: input mask
+    :type mask: numpy.ndarray
+    :return: the same mask
+    :rtype: numpy.ndarray
+    
+    Example:
+
+    .. code-block:: python
+       
+        custom_ACDC_Reader = readers.ACDC_Reader()
+        custom_ACDC_Reader.set_encoder(readers.identity())
+        custom_ACDC_Reader.set_decoder(readers.identity())
+    """
+    return mask
+
+
+_default_ACDC_Reader = ACDC_Reader()
 
 
 def height(item):
@@ -33,9 +392,10 @@ def slicing(item):
 
 def combine3D(generator):
     slices = list(generator)
+    dtype = type(slices[0][0][0])
     depth = len(slices)
     height, width = slices[0].shape
-    new_item = np.zeros((height, width, depth))
+    new_item = np.zeros((height, width, depth), dtype = dtype)
     for i in range(depth):
         new_item[:, :, i] = slices[i]
     return new_item
@@ -47,29 +407,6 @@ def truncate16(item):
 
 def truncate64(item):
     return item.astype(np.int64)
-
-
-def no_encode(mask):
-    return mask
-
-
-def no_decode(mask):
-    return mask
-
-
-def one_hot_encode(mask): 
-    mask = mask.ravel()
-    classes = len(set(mask))
-    n = len(mask)
-    mask_encoded = np.zeros((n, classes))
-    mask_encoded[np.arange(n), mask] = 1
-    new_shape = mask.shape + (classes,)
-    mask_encoded = np.reshape(mask_encoded, new_shape)
-    return mask_encoded
-
-
-def one_hot_decode(mask):
-    return mask.argmax(3)
 
 
 @lru_cache()
@@ -99,31 +436,6 @@ def resize3D_image(new_height, new_width):
                 slicing(item))))
 
 
-@lru_cache()
-def resize3D_mask(new_height, new_width, encode, decode):
-    return lambda item: encode(combine3D(
-            map(truncate64,
-            map(resize2D_mask(new_height, new_width),
-                slicing(decode(item))))))
-
-
-def resize_images_with_masks(images, masks, new_height, new_width, encode, decode):
-    """
-    Resize images according with their masks to (new_height, new_width) using bilinear interpolation for images and nearest neighbor interpolation for masks
-    Arguments:
-        - images: list of 3D numpy arrays
-        - masks: list of 4D numpy arrays corresponding to one-hot encoded masks for each image from images list
-        - new_height: number of pixel rows in resized image
-        - new_width: number of pixel columns in resized image
-    Output:
-        - resized images: list of 3D numpy arrays
-        - resized masks: list of numpy arrays (3D - if encode = None and decode = None)
-    """    
-    logging.info("Resizing images with masks...")
-    result = ([resize3D_image(new_height, new_width)(i) for i in images],
-            [resize3D_mask(new_height, new_width, encode, decode)(m) for m in masks])
-    logging.info("The images with masks have been resized successfully to {}x{}.".format(new_height, new_width))
-    return result
 
 
 def crop_height(item, new_height):
@@ -165,78 +477,9 @@ def fit_to_box(new_height, new_width):
     return internal 
 
 
-def crop_or_pad_images_with_masks(images, masks, new_height, new_width, encode, decode):
-    """
-    Central crop or zero pad images according with their masks in order to match (new_height, new_width)
-    Arguments:
-        - images: list of 3D numpy arrays
-        - masks: list of 4D numpy arrays corresponding to one-hot encoded masks for each image from images list
-        - new_height: number of pixel rows in resized image
-        - new_width: number of pixel columns in resized image
-    Output:
-        - two lists (images and masks) if the images with masks have been resized successfully:
-    """    
-    logging.info("Cropping or padding images with masks...")
-    result = ([fit_to_box(new_height, new_width)(i) for i in images],
-              [encode(fit_to_box(new_height, new_width)(decode(m))) for m in masks])         
-    logging.info("The images with masks have been cropped or padded successfully to {}x{}.".format(new_height, new_width))
-    return result
-
-
 def normalize(slices):
     return ((((s - s.min()) / (s.max() - s.min()) * 255).astype('uint8')) 
             for s in slices)
-
-
-def save_images(save_dir, images):
-    """
-    Save patient images slice by slice in PNG format
-    Arguments:
-        - save_dir: path to the directory for saving images
-        - images: list of 3D numpy arrays
-    """   
-    logging.info("Saving images...")
-    os.mkdir(save_dir)
-    for image_ind, image in enumerate(images):
-        for slice_ind, slice_image in enumerate(normalize(slicing(image))):
-            imageio.imwrite(
-                os.path.join(save_dir, "image{:03d}_slice{:02d}.png".format(image_ind + 1, slice_ind + 1)),
-                slice_image)
-    
-    logging.info("The images have been saved successfully to {} directory.".format(save_dir))
- 
-
-def save_images_with_masks(save_dir, images, masks, alpha, decode):
-    """
-    Save couples of patient image slices and these slices overlayed by masks with transparency specified by alpha (both original slices and slices with masks are displayed in one image)
-    Arguments:
-        - save_dir: path to the directory for saving images
-        - images: list of 3D numpy arrays
-        - masks: list of 4D numpy arrays corresponding to one-hot encoded masks for each image from images list
-        - alpha: the alpha blending value for mask overlay, between 0 (transparent) and 1 (opaque)
-    """ 
-    logging.info("Saving images with masks...")
-    def two_pictures_together_to_plot(image_slice, mask_slice):
-        cmap_image = plt.cm.gray
-        cmap_mask = plt.cm.Set1
-        plt.figure(figsize = (8, 3.75))
-        plt.subplot(1, 2, 1)
-        plt.axis("off")
-        plt.imshow(image_slice, cmap = cmap_image)
-        plt.subplot(1, 2, 2)
-        plt.axis("off")
-        plt.imshow(image_slice, cmap = cmap_image)
-        plt.imshow(mask_slice, cmap = cmap_mask, alpha = alpha)
-     
-    os.mkdir(save_dir)
-    for image_ind, (image, mask) in enumerate(zip(images, masks)):
-        for slice_ind, (image_slice, mask_slice) in enumerate(zip(slicing(image), slicing(decode(mask)))):
-            two_pictures_together_to_plot(image_slice, mask_slice)
-            path = os.path.join(save_dir, "image{:03d}_slice{:02d}.png".format(image_ind + 1, slice_ind + 1)) 
-            plt.savefig(path, bbox_inches = 'tight')
-            plt.close()    
-    
-    logging.info("The images with masks have been saved successfully to {} directory.".format(save_dir))
 
 
 def create_frame_path_image(patient_dir, frame_ind):
@@ -294,39 +537,3 @@ def binarize_mask_if_one_structure(patient_mask, structure):
     
     return patient_mask
 
-
-def load_patient_masks(patient_dir, mask, phase, encode):
-    return ([encode(binarize_mask_if_one_structure(load_nifti_image(f), mask)) 
-            for f in get_frames_paths(patient_dir, phase, create_frame_path_mask)])
-    
-
-def load_ACDC(data_dir, mask, phase, encode):
-    """
-    Load ACDC dataset into memory (dataset can be downloaded from https://www.creatis.insa-lyon.fr/Challenge/acdc/index.html)
-    Arguments:
-        - data_dir: path to "training" directory
-        - mask: anatomical structure of interest - right ventricle ("RV"), myocardium ("MYO"), left ventricle ("LV"), all structures ("all")
-        - phase: end diastole ("ED"), end systole ("ES"),  both phases ("both")
-    Output:
-        - two lists (images and masks) if the dataset was loaded successfully:
-            - images: list of 3D numpy arrays, loaded from .nii.gz files in "patientXXX" directories, corresponding to end diastole phase (if phase = "ED"), end systole phase (if phase = "ES") or both phases (if phase = "both")
-            - masks: list of 4D numpy arrays corresponding to one-hot encoded masks for each image from images output list (if mask = "RV", "MYO" or "LV", array values are [0., 1.] ("1" is encoded) for structure voxels and [1., 0.] ("0" is encoded) for background voxels, if mask = "all", array values are [1., 0., 0., 0.] ("0") for background, [0., 1., 0., 0.] ("1") for right vectricle, [0., 0., 1., 0.] ("2") for myocardium, [0., 0., 0., 1.] ("3") for left ventricle)
-    """     
-    if mask not in ["RV", "MYO", "LV", "all"]:
-        raise ValueError("Incorrect 'mask' parameter in function 'load_ACDC'. Expected values: 'RV', 'MYO', 'LV', 'all'.")
-
-    if phase not in ["ED", "ES", "both"]:
-        raise ValueError("Incorrect 'phase' parameter in function 'load_ACDC'. Expected values: 'ED', 'ES', 'both'.")
-        
-    logging.info("Loading ACDC dataset...")
-    glob_search = os.path.join(data_dir, "patient*")
-    patient_dirs = sorted(glob.glob(glob_search))
-    if len(patient_dirs) == 0:
-        raise EnvironmentError("Loading ACDC failed. No patient directories were found in {}.".format(data_dir))
-
-    del patient_dirs[1] # remove file patient001.Info.cfg from patient directories list
-    
-    result = ([f for i in patient_dirs for f in load_patient_images(i, phase)],
-              [f for i in patient_dirs for f in load_patient_masks(i, mask, phase, encode)])         
-    logging.info("ACDC dataset has been loaded successfully.")
-    return result
