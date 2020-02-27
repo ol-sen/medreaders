@@ -32,7 +32,7 @@ import matplotlib.pyplot as plt
 import sys
 import logging
 import skimage
-import sklearn
+
 
 from functools import lru_cache
 
