@@ -182,7 +182,7 @@ class ACDC_Reader:
 
     def _load_patient_masks(self, patient_dir, structure, phase):
         return ([self.encoder(binarize_mask_if_one_structure(load_nifti_image(f), structure)) 
-                for f in get_frames_paths(patient_dir, phase, create_frame_path_mask)])
+                for f in get_frames_paths(patient_dir, phase, create_frame_filename_mask)])
 
     @lru_cache()
     def _resize3D_mask(self, new_height, new_width):
@@ -436,8 +436,6 @@ def resize3D_image(new_height, new_width):
                 slicing(item))))
 
 
-
-
 def crop_height(item, new_height):
     remove_y_top = (height(item) - new_height) // 2
     remove_y_bottom = height(item) - new_height - remove_y_top;
@@ -482,15 +480,15 @@ def normalize(slices):
             for s in slices)
 
 
-def create_frame_path_image(patient_dir, frame_ind):
+def create_frame_filename_image(patient_dir, frame_ind):
     return "{}_frame{:02d}.nii.gz".format(os.path.split(patient_dir)[-1], frame_ind)
 
 
-def create_frame_path_mask(patient_dir, frame_ind):
+def create_frame_filename_mask(patient_dir, frame_ind):
     return "{}_frame{:02d}_gt.nii.gz".format(os.path.split(patient_dir)[-1], frame_ind)
 
 
-def get_frames_paths(patient_dir, phase, create_frame_path):
+def get_frames_paths(patient_dir, phase, create_frame_filename):
     info_file_path = os.path.join(patient_dir, "Info.cfg")
     if not os.path.isfile(info_file_path):
         raise EnvironmentError("Loadind ACDC failed. File Info.cfg was not found in patient directory {}.".format(patient_dir))
@@ -508,7 +506,7 @@ def get_frames_paths(patient_dir, phase, create_frame_path):
     elif phase == 'both':
         frame_inds = [ED_frame_ind, ES_frame_ind]
 
-    return (os.path.join(patient_dir, create_frame_path(patient_dir, i))
+    return (os.path.join(patient_dir, create_frame_filename(patient_dir, i))
             for i in frame_inds)
    
 
@@ -517,7 +515,7 @@ def load_nifti_image(file_name):
 
 
 def load_patient_images(patient_dir, phase):
-    return ([load_nifti_image(f) for f in get_frames_paths(patient_dir, phase, create_frame_path_image)])
+    return ([load_nifti_image(f) for f in get_frames_paths(patient_dir, phase, create_frame_filename_image)])
 
 
 def binarize_mask_if_one_structure(patient_mask, structure):
