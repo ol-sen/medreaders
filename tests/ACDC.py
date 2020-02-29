@@ -2,6 +2,8 @@ import numpy as np
 import logging
 import unittest
 
+import sys
+sys.path.append("/project")
 from medreaders import ACDC
 
 logging.basicConfig(level = logging.INFO)
@@ -10,7 +12,66 @@ logging.basicConfig(level = logging.INFO)
 class TestLoad(unittest.TestCase):
     def test_RV_ED(self):
         ACDC.load("datasets_samples/ACDC", "RV", "ED")
+        assert len(ACDC._default_ACDC_Reader.images) == 2
+        assert len(ACDC._default_ACDC_Reader.masks) == 2
 
+    def test_MYO_ED(self):
+        ACDC.load("datasets_samples/ACDC", "MYO", "ED")
+        assert len(ACDC._default_ACDC_Reader.images) == 2
+        assert len(ACDC._default_ACDC_Reader.masks) == 2
+
+    def test_LV_ED(self):
+        ACDC.load("datasets_samples/ACDC", "LV", "ED")
+        assert len(ACDC._default_ACDC_Reader.images) == 2
+        assert len(ACDC._default_ACDC_Reader.masks) == 2
+
+    def test_all_ED(self):
+        ACDC.load("datasets_samples/ACDC", "all", "ED")
+        assert len(ACDC._default_ACDC_Reader.images) == 2
+        assert len(ACDC._default_ACDC_Reader.masks) == 2
+
+    def test_RV_ES(self):
+        ACDC.load("datasets_samples/ACDC", "RV", "ES")
+        assert len(ACDC._default_ACDC_Reader.images) == 2
+        assert len(ACDC._default_ACDC_Reader.masks) == 2
+
+    def test_MYO_ES(self):
+        ACDC.load("datasets_samples/ACDC", "MYO", "ES")
+        assert len(ACDC._default_ACDC_Reader.images) == 2
+        assert len(ACDC._default_ACDC_Reader.masks) == 2
+
+    def test_LV_ES(self):
+        ACDC.load("datasets_samples/ACDC", "LV", "ES")
+        assert len(ACDC._default_ACDC_Reader.images) == 2
+        assert len(ACDC._default_ACDC_Reader.masks) == 2
+
+    def test_all_ES(self):
+        ACDC.load("datasets_samples/ACDC", "all", "ES")
+        assert len(ACDC._default_ACDC_Reader.images) == 2
+        assert len(ACDC._default_ACDC_Reader.masks) == 2
+
+    def test_RV_both(self):
+        ACDC.load("datasets_samples/ACDC", "RV", "both")
+        assert len(ACDC._default_ACDC_Reader.images) == 4
+        assert len(ACDC._default_ACDC_Reader.masks) == 4
+
+    def test_MYO_both(self):
+        ACDC.load("datasets_samples/ACDC", "MYO", "both")
+        assert len(ACDC._default_ACDC_Reader.images) == 4
+        assert len(ACDC._default_ACDC_Reader.masks) == 4
+
+    def test_LV_both(self):
+        ACDC.load("datasets_samples/ACDC", "LV", "both")
+        assert len(ACDC._default_ACDC_Reader.images) == 4
+        assert len(ACDC._default_ACDC_Reader.masks) == 4
+
+    def test_all_both(self):
+        ACDC.load("datasets_samples/ACDC", "all", "both")
+        assert len(ACDC._default_ACDC_Reader.images) == 4
+        assert len(ACDC._default_ACDC_Reader.masks) == 4
+
+
+"""
 
 class TestCombine3D(unittest.TestCase):
     def test_2x2x2(self):
@@ -199,4 +260,4 @@ class TestBinarizeMaskIfOneStructure(unittest.TestCase):
     def test_RV(self):
         result = ACDC.binarize_mask_if_one_structure(self.mask, "LV")
         assert (result == np.array([0, 0, 0, 1])).all()   
-
+"""
