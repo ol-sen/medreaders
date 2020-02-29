@@ -31,7 +31,7 @@ import imageio
 import matplotlib.pyplot as plt
 import sys
 import logging
-import skimage
+import skimage.transform
 
 
 from functools import lru_cache
@@ -511,7 +511,7 @@ def get_frames_paths(patient_dir, phase, create_frame_filename):
    
 
 def load_nifti_image(file_name):
-    return np.asarray(nib.load(file_name).get_data())
+    return truncate64(np.array(nib.load(file_name).get_fdata()))
 
 
 def load_patient_images(patient_dir, phase):
