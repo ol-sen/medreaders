@@ -8,69 +8,97 @@ from medreaders import ACDC
 
 logging.basicConfig(level = logging.INFO)
 
-
+"""
 class TestLoad(unittest.TestCase):
     def test_RV_ED(self):
         ACDC.load("datasets_samples/ACDC", "RV", "ED")
-        assert len(ACDC._default_ACDC_Reader.images) == 2
-        assert len(ACDC._default_ACDC_Reader.masks) == 2
+        assert len(ACDC.get_images()) == 2
+        assert len(ACDC.get_masks()) == 2
 
     def test_MYO_ED(self):
         ACDC.load("datasets_samples/ACDC", "MYO", "ED")
-        assert len(ACDC._default_ACDC_Reader.images) == 2
-        assert len(ACDC._default_ACDC_Reader.masks) == 2
+        assert len(ACDC.get_images()) == 2
+        assert len(ACDC.get_masks()) == 2
 
     def test_LV_ED(self):
         ACDC.load("datasets_samples/ACDC", "LV", "ED")
-        assert len(ACDC._default_ACDC_Reader.images) == 2
-        assert len(ACDC._default_ACDC_Reader.masks) == 2
+        assert len(ACDC.get_images()) == 2
+        assert len(ACDC.get_masks()) == 2
 
     def test_all_ED(self):
         ACDC.load("datasets_samples/ACDC", "all", "ED")
-        assert len(ACDC._default_ACDC_Reader.images) == 2
-        assert len(ACDC._default_ACDC_Reader.masks) == 2
+        assert len(ACDC.get_images()) == 2
+        assert len(ACDC.get_masks()) == 2
 
     def test_RV_ES(self):
         ACDC.load("datasets_samples/ACDC", "RV", "ES")
-        assert len(ACDC._default_ACDC_Reader.images) == 2
-        assert len(ACDC._default_ACDC_Reader.masks) == 2
+        assert len(ACDC.get_images()) == 2
+        assert len(ACDC.get_masks()) == 2
 
     def test_MYO_ES(self):
         ACDC.load("datasets_samples/ACDC", "MYO", "ES")
-        assert len(ACDC._default_ACDC_Reader.images) == 2
-        assert len(ACDC._default_ACDC_Reader.masks) == 2
+        assert len(ACDC.get_images()) == 2
+        assert len(ACDC.get_masks()) == 2
 
     def test_LV_ES(self):
         ACDC.load("datasets_samples/ACDC", "LV", "ES")
-        assert len(ACDC._default_ACDC_Reader.images) == 2
-        assert len(ACDC._default_ACDC_Reader.masks) == 2
+        assert len(ACDC.get_images()) == 2
+        assert len(ACDC.get_masks()) == 2
 
     def test_all_ES(self):
         ACDC.load("datasets_samples/ACDC", "all", "ES")
-        assert len(ACDC._default_ACDC_Reader.images) == 2
-        assert len(ACDC._default_ACDC_Reader.masks) == 2
+        assert len(ACDC.get_images()) == 2
+        assert len(ACDC.get_masks()) == 2
 
     def test_RV_both(self):
         ACDC.load("datasets_samples/ACDC", "RV", "both")
-        assert len(ACDC._default_ACDC_Reader.images) == 4
-        assert len(ACDC._default_ACDC_Reader.masks) == 4
+        assert len(ACDC.get_images()) == 4
+        assert len(ACDC.get_masks()) == 4
 
     def test_MYO_both(self):
         ACDC.load("datasets_samples/ACDC", "MYO", "both")
-        assert len(ACDC._default_ACDC_Reader.images) == 4
-        assert len(ACDC._default_ACDC_Reader.masks) == 4
+        assert len(ACDC.get_images()) == 4
+        assert len(ACDC.get_masks()) == 4
 
     def test_LV_both(self):
         ACDC.load("datasets_samples/ACDC", "LV", "both")
-        assert len(ACDC._default_ACDC_Reader.images) == 4
-        assert len(ACDC._default_ACDC_Reader.masks) == 4
+        assert len(ACDC.get_images()) == 4
+        assert len(ACDC.get_masks()) == 4
 
     def test_all_both(self):
         ACDC.load("datasets_samples/ACDC", "all", "both")
-        assert len(ACDC._default_ACDC_Reader.images) == 4
-        assert len(ACDC._default_ACDC_Reader.masks) == 4
+        assert len(ACDC.get_images()) == 4
+        assert len(ACDC.get_masks()) == 4
 
 
+class TestResize(unittest.TestCase):
+    def setUp(self):
+        ACDC.load("datasets_samples/ACDC", "all", "ED")
+    
+    def test_300x300_Interpolate(self):
+        ACDC.resize(300, 300)
+        images = ACDC.get_images()
+        masks = ACDC.get_masks()
+        assert all(i.shape[0] == 300 and i.shape[1] == 300 for i in images)
+        assert all(m.shape[0] == 300 and m.shape[1] == 300 for m in masks)
+
+    def test_300x300_Interpolate(self):
+        ACDC.resize(300, 300, interpolate = False)
+        images = ACDC.get_images()
+        masks = ACDC.get_masks()
+        assert all(i.shape[0] == 300 and i.shape[1] == 300 for i in images)
+        assert all(m.shape[0] == 300 and m.shape[1] == 300 for m in masks)
+"""
+
+class TestSave(unittest.TestCase):
+    def setUp(self):
+        ACDC.load("datasets_samples/ACDC", "all", "ED")
+     
+    def test_default(self):
+        ACDC.save("Images1", "Masks1")    
+
+    def test_default_alpha_1(self):
+        ACDC.save("Images2", "Masks2", alpha = 1) 
 """
 
 class TestCombine3D(unittest.TestCase):
