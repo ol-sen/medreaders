@@ -326,7 +326,7 @@ def one_hot_encode(mask):
     mask = mask.ravel()
     classes = len(set(mask))
     n = len(mask)
-    mask_encoded = np.zeros((n, classes))
+    mask_encoded = np.zeros((n, classes), dtype = type(mask[0]))
     mask_encoded[np.arange(n), mask] = 1
     new_shape = input_shape + (classes,)
     mask_encoded = np.reshape(mask_encoded, new_shape)
@@ -348,7 +348,7 @@ def one_hot_decode(mask):
        
         decoded_mask = readers.one_hot_decode(encoded_mask)
     """
-    return mask.argmax(3)
+    return mask.argmax(len(mask.shape) - 1)
 
 
 def identity(mask):
