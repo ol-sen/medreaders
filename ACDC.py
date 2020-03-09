@@ -53,6 +53,12 @@ class ACDC_Reader:
     def set_decoder(self, decode):
         self.decoder = decode
 
+    def get_images(self):
+        return self.images
+
+    def get_masks(self):
+        return self.masks
+
     def load(self, data_dir, structure, phase):
         """
         Loads ACDC dataset into memory (the dataset can be downloaded from https://www.creatis.insa-lyon.fr/Challenge/acdc/index.html).
@@ -187,7 +193,7 @@ class ACDC_Reader:
     @lru_cache()
     def _resize3D_mask(self, new_height, new_width):
         return lambda item: self.encoder(combine3D(
-            map(truncate64,
+            map(truncate_int64,
             map(resize2D_mask(new_height, new_width),
                 slicing(self.decoder(item))))))
 
@@ -203,7 +209,7 @@ def set_encoder(encode):
 
 
 def set_decoder(decode):
-    _default_ACDC_Reader.set_decoder(encode)
+    _default_ACDC_Reader.set_decoder(decode)
 
 
 def load(data_dir, structure, phase):
@@ -401,11 +407,7 @@ def combine3D(generator):
     return new_item
 
 
-def truncate16(item):
-    return item.astype(np.int16)
-
-
-def truncate64(item):
+def truncate_int64(item):
     return item.astype(np.int64)
 
 
@@ -431,7 +433,7 @@ def resize2D_mask(new_height, new_width):
 @lru_cache()
 def resize3D_image(new_height, new_width):
     return lambda item: combine3D(
-            map(truncate16,
+            map(truncate_int64,
             map(resize2D_image(new_height, new_width),
                 slicing(item))))
 
@@ -503,7 +505,7 @@ def get_frames_paths(patient_dir, phase, create_frame_filename):
         frame_inds = [ED_frame_ind]
     elif phase == 'ES':
         frame_inds = [ES_frame_ind]
-    elif phase == 'both':
+    else:
         frame_inds = [ED_frame_ind, ES_frame_ind]
 
     return (os.path.join(patient_dir, create_frame_filename(patient_dir, i))
@@ -511,7 +513,7 @@ def get_frames_paths(patient_dir, phase, create_frame_filename):
    
 
 def load_nifti_image(file_name):
-    return truncate64(np.array(nib.load(file_name).get_fdata()))
+    return np.array(nib.load(file_name).get_fdata(), dtype = np.int64)
 
 
 def load_patient_images(patient_dir, phase):
