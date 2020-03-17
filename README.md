@@ -18,4 +18,10 @@ Currently the repository contains the code for reading [ACDC dataset](https://ww
 
 ## Installation
 
+```
+pip3 install medreaders
+```
 
+## Documentation
+
+Documentation is available at https://medreaders.readthedocs.io
