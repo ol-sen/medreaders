@@ -1,23 +1,36 @@
 # Copyright (c) 2020 Olga Senyukova. All rights reserved.
 # License: http://opensource.org/licenses/MIT
 """
-medreaders --- Readers for medical image datasets
+ACDC --- Reader for ACDC dataset
 =================================================
-**Source code:** `readers.py <https://github.com/ol-sen/medreaders/blob/master/readers.py>`_
+**Source code:** `ACDC.py <https://github.com/ol-sen/medreaders/blob/master/ACDC.py>`_
 
 --------------
 
-The :mod:`readers` module contains the code for reading medical image datasets into memory and for auxiliary tasks:
-    * resize images with ground truth masks by interpolation;
-    * resize images with ground truth masks by cropping and padding;
-    * save images slice by slice to PNG;
-    * save pairs of images and ground truth masks to PNG.
+The :mod:`ACDC` module contains the code for reading ACDC dataset into memory and for auxiliary tasks:
+    * resize images with their ground truth masks;
+    * save images and their ground truth masks slice by slice to PNG.
 
-You can specify anatomical structure of interest for loading ground truth masks or load masks with all structures.
+Before using this code you should download `ACDC dataset <https://www.creatis.insa-lyon.fr/Challenge/acdc/index.html>`_.
 
-You can use functions with default loader or create a custom loader.
+Simple usage example:
 
-In order to use the functions from this repository you should download a dataset that you need from `Grand Challenges in Biomedical Image Analysis <https://grand-challenge.org/challenges/>`_. Currently the repository contains the code for reading `ACDC dataset <https://www.creatis.insa-lyon.fr/Challenge/acdc/index.html>`_.
+.. code-block:: python
+    
+    import medreaders
+    from medreaders import ACDC
+    ACDC.load("ACDC/training", "all", "ED")        
+    ACDC.resize(216, 256) 
+    ACDC.save("PatientImages", "PatientImagesWithMasks")
+    images = ACDC.get_images()
+    masks = ACDC.get_masks()
+
+`One-hot encoding <https://en.wikipedia.org/wiki/One-hot>`_ is used for ground truth masks by default. If you don't want to use it, you can set :func:`identity` as encoder and decoder before using :func:`load` function:
+
+.. code-block:: python
+    
+    ACDC.set_encoder(ACDC.identity)
+    ACDC.set_decoder(ACDC.identity)
 
 Functions
 ---------
@@ -48,15 +61,84 @@ class ACDC_Reader:
         self.masks = []
 
     def set_encoder(self, encode):
+        """
+        Sets the function for encoding of ground truth masks specified by *encode* parameter.
+        
+        param function encode: encoding function 
+        
+        Example 1:
+
+        .. code-block:: python   
+
+            custom_ACDC_Reader.set_encoder(ACDC.one_hot_encode)
+            custom_ACDC_Reader.set_decoder(ACDC.one_hot_decode)
+       
+        Example 2:
+
+        .. code-block:: python   
+
+            custom_ACDC_Reader.set_encoder(ACDC.identity)
+            custom_ACDC_Reader.set_decoder(ACDC.identity)
+ 
+        .. note::
+            Encoder and decoder should be set simultaneously and should correspond to mutually inverse functions.
+        """
         self.encoder = encode
 
     def set_decoder(self, decode):
+        """
+        Sets the function for decoding of encoded ground truth masks specified by *decode* parameter.
+        
+        param function decode: decoding function 
+        
+        Example 1:
+
+        .. code-block:: python   
+
+            custom_ACDC_Reader.set_encoder(ACDC.one_hot_encode)
+            custom_ACDC_Reader.set_decoder(ACDC.one_hot_decode)
+       
+        Example 2:
+
+        .. code-block:: python   
+
+            custom_ACDC_Reader.set_encoder(ACDC.identity)
+            custom_ACDC_Reader.set_decoder(ACDC.identity)
+ 
+        .. note::
+            Encoder and decoder should be set simultaneously and should correspond to mutually inverse functions.
+        """
         self.decoder = decode
 
     def get_images(self):
+        """
+        Gets all patient images.
+
+        returns: a list of images
+        rtype: a list of numpy.ndarrays  
+        
+        Example:
+
+        .. code-block:: python   
+
+            images = custom_ACDC_Readers.get_images()
+        """
         return self.images
 
     def get_masks(self):
+        """
+        Gets ground truth masks for all patient images.
+
+        returns: a list of masks
+        rtype: a list of numpy.ndarrays  
+        
+        Example:
+
+        .. code-block:: python   
+
+            masks = custom_ACDC_Readers.get_masks()
+
+        """
         return self.masks
 
     def load(self, data_dir, structure, phase):
@@ -73,10 +155,7 @@ class ACDC_Reader:
 
         .. code-block:: python
            
-            custom_ACDC_Reader = readers.ACDC_Reader()
-            custom_ACDC_Reader.set_encoder(readers.identity())
-            custom_ACDC_Reader.set_decoder(readers.identity())
-            custom_ACDC_Reader.load("../ACDC/training", "all", "ED")
+            custom_ACDC_Reader.load("ACDC/training", "all", "ED")
         """
         if structure not in ["RV", "MYO", "LV", "all"]:
             raise ValueError("Incorrect 'mask' parameter in function 'load'. Expected values: 'RV', 'MYO', 'LV', 'all'.")
@@ -103,17 +182,13 @@ class ACDC_Reader:
         :param interpolate: whether to use interpolation or cropping/padding
         :type interpolate: bool
         
-        Example:
+        Example 1:
 
         .. code-block:: python
             
-            custom_ACDC_Reader = readers.ACDC_Reader()
-            custom_ACDC_Reader.set_encoder(readers.identity())
-            custom_ACDC_Reader.set_decoder(readers.identity())
-            custom_ACDC_Reader.load("../ACDC/training", "all", "ED")
             custom_ACDC_Reader.resize(216, 256) 
         
-        Example:
+        Example 2:
 
         .. code-block:: python
             
@@ -137,25 +212,21 @@ class ACDC_Reader:
         Saves original images slice by slice in PNG format to *save_dir_images*. Saves pairs of images and these images overlayed by ground truth masks slice by slice in PNG format to *save_dir_masks*.
         
         :param str save_dir_images: path to the directory for saving original images
-        :param std save_dir_masks: path to the directory for saving images with masks
+        :param str save_dir_masks: path to the directory for saving images with masks
         :param alpha: the alpha blending value for mask overlay, between 0 (transparent) and 1 (opaque)
         :type alpha: float
         
-        Example:
+        Example 1:
 
         .. code-block:: python
             
-            custom_ACDC_Reader = readers.ACDC_Reader()
-            custom_ACDC_Reader.set_encoder(readers.identity())
-            custom_ACDC_Reader.set_decoder(readers.identity())
-            custom_ACDC_Reader.load("../ACDC/training", "all", "ED")
-            custom_ACDC_Reader.save("../PatientImagesOriginal", "../PatientImagesWithMasks")
+            custom_ACDC_Reader.save("PatientImages", "PatientImagesWithMasks")
         
-        Example:
+        Example 2:
 
         .. code-block:: python
             
-            custom_ACDC_Reader.save("../PatientImagesOriginal", "../PatientImagesWithMasks", alpha = 0.2)
+            custom_ACDC_Reader.save("PatientImages", "PatientImagesWithMasks", alpha = 0.2)
 """   
         logging.info("Saving images...")
         os.mkdir(save_dir_images)
@@ -199,16 +270,76 @@ class ACDC_Reader:
 
 
 def get_ACDC_reader(name):
+    """
+    Gets ACDC reader (instance of class ACDC_Reader) by name if it already exists or creates a new reader and adds it to the list of ACDC readers.
+
+    param name: name of ACDC reader
+    returns: ACDC reader with the name specified by *name* parameter
+    rtype: class 'medreaders.ACDC.ACDC_Reader'
+    
+    Example:
+
+    .. code-block:: python
+            
+        my_Reader = get_ACDC_Reader(custom_ACDC_Reader)
+    """
     if name not in _acdc_readers:
         _acdc_readers[name] = ACDC_Reader()
     return _acdc_readers[name]
 
 
 def set_encoder(encode):
+    """
+    Sets the function for encoding of ground truth masks specified by *encode* parameter.
+        
+    :param encode: encoding function
+    :type encode: function
+        
+    Example 1:
+
+    .. code-block:: python   
+
+        ACDC.set_encoder(ACDC.one_hot_encode)
+        ACDC.set_decoder(ACDC.one_hot_decode)
+       
+    Example 2:
+
+    .. code-block:: python   
+
+        ACDC.set_encoder(ACDC.identity)
+        ACDC.set_decoder(ACDC.identity)
+ 
+    .. note::
+        Encoder and decoder should be set simultaneously and should correspond to mutually inverse functions.
+    """
     _default_ACDC_Reader.set_encoder(encode)
 
 
 def set_decoder(decode):
+    """
+    Sets the function for decoding of encoded ground truth masks specified by *decode* parameter.
+        
+    :param decode: decoding function
+    :type decode: function
+        
+    Example 1:
+
+    .. code-block:: python   
+
+        ACDC.set_encoder(ACDC.one_hot_encode)
+        ACDC.set_decoder(ACDC.one_hot_decode)
+       
+    Example 2:
+
+    .. code-block:: python   
+
+        ACDC.set_encoder(ACDC.identity)
+        ACDC.set_decoder(ACDC.identity)
+ 
+    .. note::
+        Encoder and decoder should be set simultaneously and should correspond to mutually inverse functions.
+    """
+
     _default_ACDC_Reader.set_decoder(decode)
 
 
@@ -226,7 +357,7 @@ def load(data_dir, structure, phase):
 
     .. code-block:: python
            
-        readers.load("../ACDC/training", "all", "ED")
+        ACDC.load("ACDC/training", "all", "ED")
     """
     return _default_ACDC_Reader.load(data_dir, structure, phase)
 
@@ -242,17 +373,17 @@ def resize(new_height, new_width, interpolate = True):
     :param interpolate: whether to use interpolation or cropping/padding
     :type interpolate: bool
         
-    Example:
+    Example 1:
 
     .. code-block:: python
             
-        readers.resize(216, 256) 
+        ACDC.resize(216, 256) 
         
-    Example:
+    Example 2:
 
     .. code-block:: python
             
-        readers.resize(216, 256, interpolate = False) 
+        ACDC.resize(216, 256, interpolate = False) 
     """
     return _default_ACDC_Reader.resize(new_height, new_width, interpolate)
 
@@ -262,21 +393,21 @@ def save(save_dir_images, save_dir_masks, alpha = 0.5):
     Saves original images slice by slice in PNG format to *save_dir_images*. Saves pairs of images and these images overlayed by ground truth masks slice by slice in PNG format to *save_dir_masks*.
         
     :param str save_dir_images: path to the directory for saving original images
-    :param std save_dir_masks: path to the directory for saving images with masks
+    :param str save_dir_masks: path to the directory for saving images with masks
     :param alpha: the alpha blending value for mask overlay, between 0 (transparent) and 1 (opaque)
     :type alpha: float
         
-    Example:
+    Example 1:
 
     .. code-block:: python
             
-        readers.save("../PatientImagesOriginal", "../PatientImagesWithMasks")
+        ACDC.save("PatientImagesOriginal", "PatientImagesWithMasks")
         
-    Example:
+    Example 2:
 
     .. code-block:: python
             
-        readers.save("../PatientImagesOriginal", "../PatientImagesWithMasks", alpha = 0.2)
+        ACDC.save("PatientImagesOriginal", "PatientImagesWithMasks", alpha = 0.2)
 """   
     return _default_ACDC_Reader.save(save_dir_images, save_dir_masks, alpha)
 
@@ -292,7 +423,7 @@ def get_images():
 
     .. code-block:: python
 
-        images = readers.get_images()
+        images = ACDC.get_images()
     """
     return _default_ACDC_Reader.images
 
@@ -308,7 +439,7 @@ def get_masks():
 
     .. code-block:: python
 
-        masks = readers.get_masks()
+        masks = ACDC.get_masks()
     """
     return _default_ACDC_Reader.masks
 
@@ -326,7 +457,7 @@ def one_hot_encode(mask):
 
     .. code-block:: python
        
-        encoded_mask = readers.one_hot_encode(input_mask)
+        encoded_mask = ACDC.one_hot_encode(input_mask)
     """
     input_shape = mask.shape
     mask = mask.ravel()
@@ -352,7 +483,7 @@ def one_hot_decode(mask):
 
     .. code-block:: python
        
-        decoded_mask = readers.one_hot_decode(encoded_mask)
+        decoded_mask = ACDC.one_hot_decode(encoded_mask)
     """
     return mask.argmax(len(mask.shape) - 1)
 
@@ -370,9 +501,8 @@ def identity(mask):
 
     .. code-block:: python
        
-        custom_ACDC_Reader = readers.ACDC_Reader()
-        custom_ACDC_Reader.set_encoder(readers.identity())
-        custom_ACDC_Reader.set_decoder(readers.identity())
+        ACDC.set_encoder(ACDC.identity)
+        ACDC.set_decoder(ACDC.identity)
     """
     return mask
 

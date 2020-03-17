@@ -3,45 +3,70 @@ import logging
 import unittest
 import os
 
-import sys
-sys.path.append("/project")
 from medreaders import ACDC
 
 logging.basicConfig(level = logging.INFO)
 
+
+class TestAll(unittest.TestCase):
+    def setUp(self):
+        if not os.path.isdir("results"):
+            os.mkdir("results")
+
+    def test_default(self):
+        ACDC.load("../../datasets_samples/ACDC", "all", "ED")        
+        ACDC.resize(216, 256) 
+        ACDC.save("results/PatientImagesOneHot", "results/PatientImagesWithMasksOneHot")
+        images = ACDC.get_images()
+        masks = ACDC.get_masks()
+        assert len(images) == 2
+        assert len(masks) == 2
+    
+    def test_identity(self):
+        ACDC.set_encoder(ACDC.identity)
+        ACDC.set_decoder(ACDC.identity)
+        ACDC.load("../../datasets_samples/ACDC", "all", "ED")        
+        ACDC.resize(216, 256) 
+        ACDC.save("results/PatientImagesIdentity", "results/PatientImagesWithMasksIdentity")
+        images = ACDC.get_images()
+        masks = ACDC.get_masks()
+        assert len(images) == 2
+        assert len(masks) == 2
+
+
 class TestACDCReaderLoad(unittest.TestCase):
     def test_RV_ED(self):
-        ACDC._default_ACDC_Reader.load("datasets_samples/ACDC", "RV", "ED")
+        ACDC._default_ACDC_Reader.load("../../datasets_samples/ACDC", "RV", "ED")
         assert len(ACDC._default_ACDC_Reader.get_images()) == 2
         assert len(ACDC._default_ACDC_Reader.get_masks()) == 2
  
     def test_RV_both(self):
-        ACDC._default_ACDC_Reader.load("datasets_samples/ACDC", "RV", "both")
+        ACDC._default_ACDC_Reader.load("../../datasets_samples/ACDC", "RV", "both")
         assert len(ACDC._default_ACDC_Reader.get_images()) == 4
         assert len(ACDC._default_ACDC_Reader.get_masks()) == 4
 
     def test_incorrect_structure(self):
         with self.assertRaises(ValueError):
-            ACDC._default_ACDC_Reader.load("datasets_samples/ACDC", "aaa", "ED")
+            ACDC._default_ACDC_Reader.load("../../datasets_samples/ACDC", "aaa", "ED")
     
     def test_incorrect_phase(self):
         with self.assertRaises(ValueError):
-            ACDC._default_ACDC_Reader.load("datasets_samples/ACDC", "RV", "aaa")
+            ACDC._default_ACDC_Reader.load("../../datasets_samples/ACDC", "RV", "aaa")
     
     def test_incorrect_directory(self):
         with self.assertRaises(EnvironmentError):
-            ACDC._default_ACDC_Reader.load("datasets_samples", "RV", "ED")
+            ACDC._default_ACDC_Reader.load("../../datasets_samples", "RV", "ED")
  
 
 class TestACDCReaderResize(unittest.TestCase):
     def setUp(self):
-        ACDC._default_ACDC_Reader.load("datasets_samples/ACDC", "all", "ED")
-        if not os.path.isdir("Results"):
-            os.mkdir("Results")
+        ACDC._default_ACDC_Reader.load("../../datasets_samples/ACDC", "all", "ED")
+        if not os.path.isdir("results"):
+            os.mkdir("results")
     
     def test_300x300_interpolate(self):
         ACDC._default_ACDC_Reader.resize(300, 300)
-        ACDC._default_ACDC_Reader.save("Results/Images300x300Interp", "Results/Masks300x300Interp")
+        ACDC._default_ACDC_Reader.save("results/Images300x300Interp", "results/Masks300x300Interp")
         images = ACDC._default_ACDC_Reader.get_images()
         masks = ACDC._default_ACDC_Reader.get_masks()
         assert all(i.shape[0] == 300 and i.shape[1] == 300 for i in images)
@@ -49,7 +74,7 @@ class TestACDCReaderResize(unittest.TestCase):
 
     def test_300x300_no_interpolate(self):
         ACDC._default_ACDC_Reader.resize(300, 300, interpolate = False)
-        ACDC._default_ACDC_Reader.save("Results/Images300x300NoInterp", "Results/Masks300x300NoInterp")
+        ACDC._default_ACDC_Reader.save("results/Images300x300NoInterp", "results/Masks300x300NoInterp")
         images = ACDC._default_ACDC_Reader.get_images()
         masks = ACDC._default_ACDC_Reader.get_masks()
         assert all(i.shape[0] == 300 and i.shape[1] == 300 for i in images)
@@ -57,7 +82,7 @@ class TestACDCReaderResize(unittest.TestCase):
 
     def test_100x100_interpolate(self):
         ACDC._default_ACDC_Reader.resize(100, 100)
-        ACDC._default_ACDC_Reader.save("Results/Images100x100Interp", "Results/Masks100x100Interp")
+        ACDC._default_ACDC_Reader.save("results/Images100x100Interp", "results/Masks100x100Interp")
         images = ACDC._default_ACDC_Reader.get_images()
         masks = ACDC._default_ACDC_Reader.get_masks()
         assert all(i.shape[0] == 100 and i.shape[1] == 100 for i in images)
@@ -65,7 +90,7 @@ class TestACDCReaderResize(unittest.TestCase):
 
     def test_100x100_no_interpolate(self):
         ACDC._default_ACDC_Reader.resize(100, 100, interpolate = False)
-        ACDC._default_ACDC_Reader.save("Results/Images100x100NoInterp", "Results/Masks100x100NoInterp")
+        ACDC._default_ACDC_Reader.save("results/Images100x100NoInterp", "results/Masks100x100NoInterp")
         images = ACDC._default_ACDC_Reader.get_images()
         masks = ACDC._default_ACDC_Reader.get_masks()
         assert all(i.shape[0] == 100 and i.shape[1] == 100 for i in images)
@@ -74,75 +99,75 @@ class TestACDCReaderResize(unittest.TestCase):
 
 class TestACDCReaderSave(unittest.TestCase):
     def setUp(self):
-        ACDC._default_ACDC_Reader.load("datasets_samples/ACDC", "all", "ED")
-        if not os.path.isdir("Results"):
-            os.mkdir("Results")
+        ACDC._default_ACDC_Reader.load("../../datasets_samples/ACDC", "all", "ED")
+        if not os.path.isdir("results"):
+            os.mkdir("results")
 
     def test_default(self):
-        ACDC._default_ACDC_Reader.save("Results/ImagesAlphaDefault", "Results/MasksAlphaDefault")    
+        ACDC._default_ACDC_Reader.save("results/ImagesAlphaDefault", "results/MasksAlphaDefault")    
 
     def test_default_alpha_1(self):
-        ACDC._default_ACDC_Reader.save("Results/ImagesAlpha1", "Results/MasksAlpha1", alpha = 1) 
+        ACDC._default_ACDC_Reader.save("results/ImagesAlpha1", "results/MasksAlpha1", alpha = 1) 
 
 
 class TestACDCReaderLoadPatientMasks(unittest.TestCase):
     def test_RV_ED(self):
-        masks_generator = ACDC._default_ACDC_Reader._load_patient_masks("datasets_samples/ACDC/patient001", "RV", "ED")
+        masks_generator = ACDC._default_ACDC_Reader._load_patient_masks("../../datasets_samples/ACDC/patient001", "RV", "ED")
         masks = list(masks_generator)
         assert len(masks) == 1
 
     def test_MYO_ED(self):
-        masks_generator = ACDC._default_ACDC_Reader._load_patient_masks("datasets_samples/ACDC/patient001", "MYO", "ED")
+        masks_generator = ACDC._default_ACDC_Reader._load_patient_masks("../../datasets_samples/ACDC/patient001", "MYO", "ED")
         masks = list(masks_generator)
         assert len(masks) == 1
 
     def test_LV_ED(self):
-        masks_generator = ACDC._default_ACDC_Reader._load_patient_masks("datasets_samples/ACDC/patient001", "LV", "ED")
+        masks_generator = ACDC._default_ACDC_Reader._load_patient_masks("../../datasets_samples/ACDC/patient001", "LV", "ED")
         masks = list(masks_generator)
         assert len(masks) == 1
 
     def test_all_ED(self):
-        masks_generator = ACDC._default_ACDC_Reader._load_patient_masks("datasets_samples/ACDC/patient001", "all", "ED")
+        masks_generator = ACDC._default_ACDC_Reader._load_patient_masks("../../datasets_samples/ACDC/patient001", "all", "ED")
         masks = list(masks_generator)
         assert len(masks) == 1
 
     def test_RV_ES(self):
-        masks_generator = ACDC._default_ACDC_Reader._load_patient_masks("datasets_samples/ACDC/patient001", "RV", "ES")
+        masks_generator = ACDC._default_ACDC_Reader._load_patient_masks("../../datasets_samples/ACDC/patient001", "RV", "ES")
         masks = list(masks_generator)
         assert len(masks) == 1
 
     def test_MYO_ES(self):
-        masks_generator = ACDC._default_ACDC_Reader._load_patient_masks("datasets_samples/ACDC/patient001", "MYO", "ES")
+        masks_generator = ACDC._default_ACDC_Reader._load_patient_masks("../../datasets_samples/ACDC/patient001", "MYO", "ES")
         masks = list(masks_generator)
         assert len(masks) == 1
 
     def test_LV_ES(self):
-        masks_generator = ACDC._default_ACDC_Reader._load_patient_masks("datasets_samples/ACDC/patient001", "LV", "ES")
+        masks_generator = ACDC._default_ACDC_Reader._load_patient_masks("../../datasets_samples/ACDC/patient001", "LV", "ES")
         masks = list(masks_generator)
         assert len(masks) == 1
 
     def test_all_ES(self):
-        masks_generator = ACDC._default_ACDC_Reader._load_patient_masks("datasets_samples/ACDC/patient001", "all", "ES")
+        masks_generator = ACDC._default_ACDC_Reader._load_patient_masks("../../datasets_samples/ACDC/patient001", "all", "ES")
         masks = list(masks_generator)
         assert len(masks) == 1
 
     def test_RV_both(self):
-        masks_generator = ACDC._default_ACDC_Reader._load_patient_masks("datasets_samples/ACDC/patient001", "RV", "both")
+        masks_generator = ACDC._default_ACDC_Reader._load_patient_masks("../../datasets_samples/ACDC/patient001", "RV", "both")
         masks = list(masks_generator)
         assert len(masks) == 2
 
     def test_MYO_both(self):
-        masks_generator = ACDC._default_ACDC_Reader._load_patient_masks("datasets_samples/ACDC/patient001", "MYO", "both")
+        masks_generator = ACDC._default_ACDC_Reader._load_patient_masks("../../datasets_samples/ACDC/patient001", "MYO", "both")
         masks = list(masks_generator)
         assert len(masks) == 2
 
     def test_LV_both(self):
-        masks_generator = ACDC._default_ACDC_Reader._load_patient_masks("datasets_samples/ACDC/patient001", "LV", "both")
+        masks_generator = ACDC._default_ACDC_Reader._load_patient_masks("../../datasets_samples/ACDC/patient001", "LV", "both")
         masks = list(masks_generator)
         assert len(masks) == 2
 
     def test_all_both(self):
-        masks_generator = ACDC._default_ACDC_Reader._load_patient_masks("datasets_samples/ACDC/patient001", "all", "both")
+        masks_generator = ACDC._default_ACDC_Reader._load_patient_masks("../../datasets_samples/ACDC/patient001", "all", "both")
         masks = list(masks_generator)
         assert len(masks) == 2
 
@@ -167,14 +192,14 @@ class TestACDCReaderResize3DMask(unittest.TestCase):
 
 class TestLoad(unittest.TestCase):
     def test_RV_ED(self):
-        ACDC.load("datasets_samples/ACDC", "RV", "ED")
+        ACDC.load("../../datasets_samples/ACDC", "RV", "ED")
         assert len(ACDC.get_images()) == 2
         assert len(ACDC.get_masks()) == 2
 
 
 class TestResize(unittest.TestCase):
     def test_300x300(self): 
-        ACDC.load("datasets_samples/ACDC", "all", "ED")
+        ACDC.load("../../datasets_samples/ACDC", "all", "ED")
         ACDC.resize(300, 300)
         images = ACDC.get_images()
         masks = ACDC.get_masks()
@@ -184,10 +209,10 @@ class TestResize(unittest.TestCase):
 
 class TestSave(unittest.TestCase):
     def test_default(self):
-        ACDC.load("datasets_samples/ACDC", "all", "ED")
-        if not os.path.isdir("Results"):
-            os.mkdir("Results")
-        ACDC.save("Results/ImagesAlphaDefault_2", "Results/MasksAlphaDefault_2")    
+        ACDC.load("../../datasets_samples/ACDC", "all", "ED")
+        if not os.path.isdir("results"):
+            os.mkdir("results")
+        ACDC.save("results/ImagesAlphaDefault_2", "results/MasksAlphaDefault_2")    
 
 class TestOneHotEncode(unittest.TestCase):
     def test_012x210(self):
@@ -321,62 +346,62 @@ class TestNormalize(unittest.TestCase):
 
 class TestCreateFrameFilenameImage(unittest.TestCase):
     def test_patient001_frame01(self):
-        filename = ACDC.create_frame_filename_image("datasets_samples/ACDC/patient001", 1)
+        filename = ACDC.create_frame_filename_image("../../datasets_samples/ACDC/patient001", 1)
         assert filename == "patient001_frame01.nii.gz"        
 
 
 class TestCreateFrameFilenameMask(unittest.TestCase):
     def test_patient001_frame12(self):
-        filename = ACDC.create_frame_filename_mask("datasets_samples/ACDC/patient001", 12)
+        filename = ACDC.create_frame_filename_mask("../../datasets_samples/ACDC/patient001", 12)
         assert filename == "patient001_frame12_gt.nii.gz"        
 
 
 class TestGetFramesPaths(unittest.TestCase):
     def test_patient001_ED_image(self):
-        result_generator = ACDC.get_frames_paths("datasets_samples/ACDC/patient001", "ED", ACDC.create_frame_filename_image)
+        result_generator = ACDC.get_frames_paths("../../datasets_samples/ACDC/patient001", "ED", ACDC.create_frame_filename_image)
         result = list(result_generator)
-        assert result[0] == "datasets_samples/ACDC/patient001/patient001_frame01.nii.gz"    
+        assert result[0] == "../../datasets_samples/ACDC/patient001/patient001_frame01.nii.gz"    
 
     def test_patient001_ED_mask(self):
-        result_generator = ACDC.get_frames_paths("datasets_samples/ACDC/patient001", "ED", ACDC.create_frame_filename_mask)
+        result_generator = ACDC.get_frames_paths("../../datasets_samples/ACDC/patient001", "ED", ACDC.create_frame_filename_mask)
         result = list(result_generator)
-        assert result[0] == "datasets_samples/ACDC/patient001/patient001_frame01_gt.nii.gz" 
+        assert result[0] == "../../datasets_samples/ACDC/patient001/patient001_frame01_gt.nii.gz" 
 
     def test_patient001_ES_image(self):
-        result_generator = ACDC.get_frames_paths("datasets_samples/ACDC/patient001", "ES", ACDC.create_frame_filename_image)
+        result_generator = ACDC.get_frames_paths("../../datasets_samples/ACDC/patient001", "ES", ACDC.create_frame_filename_image)
         result = list(result_generator)
-        assert result[0] == "datasets_samples/ACDC/patient001/patient001_frame12.nii.gz"    
+        assert result[0] == "../../datasets_samples/ACDC/patient001/patient001_frame12.nii.gz"    
 
     def test_patient001_both_image(self):
-        result_generator = ACDC.get_frames_paths("datasets_samples/ACDC/patient001", "both", ACDC.create_frame_filename_image)
+        result_generator = ACDC.get_frames_paths("../../datasets_samples/ACDC/patient001", "both", ACDC.create_frame_filename_image)
         result = list(result_generator)
-        assert result[0] == "datasets_samples/ACDC/patient001/patient001_frame01.nii.gz"    
-        assert result[1] == "datasets_samples/ACDC/patient001/patient001_frame12.nii.gz"    
+        assert result[0] == "../../datasets_samples/ACDC/patient001/patient001_frame01.nii.gz"    
+        assert result[1] == "../../datasets_samples/ACDC/patient001/patient001_frame12.nii.gz"    
 
     def test_incorrect_directory(self):
         with self.assertRaises(EnvironmentError):
-            result_generator = ACDC.get_frames_paths("datasets_samples/ACDC", "ED", ACDC.create_frame_filename_image)
+            result_generator = ACDC.get_frames_paths("../../datasets_samples/ACDC", "ED", ACDC.create_frame_filename_image)
 
 
 class TestLoadNiftiImage(unittest.TestCase):
     def test_patient001(self):
-        image = ACDC.load_nifti_image("datasets_samples/ACDC/patient001/patient001_frame01.nii.gz")
+        image = ACDC.load_nifti_image("../../datasets_samples/ACDC/patient001/patient001_frame01.nii.gz")
         assert type(image) == np.ndarray
 
 
 class TestLoadPatientImages(unittest.TestCase):
     def test_patient001_ED(self):
-        images_generator = ACDC.load_patient_images("datasets_samples/ACDC/patient001", "ED")
+        images_generator = ACDC.load_patient_images("../../datasets_samples/ACDC/patient001", "ED")
         images = list(images_generator)
         assert len(images) == 1 
 
     def test_patient001_ES(self):
-        images_generator = ACDC.load_patient_images("datasets_samples/ACDC/patient001", "ES")
+        images_generator = ACDC.load_patient_images("../../datasets_samples/ACDC/patient001", "ES")
         images = list(images_generator)
         assert len(images) == 1 
 
     def test_patient001_both(self):
-        images_generator = ACDC.load_patient_images("datasets_samples/ACDC/patient001", "both")
+        images_generator = ACDC.load_patient_images("../../datasets_samples/ACDC/patient001", "both")
         images = list(images_generator)
         assert len(images) == 2
 
