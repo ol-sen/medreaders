@@ -3,9 +3,7 @@
 """
 ACDC --- Reader for ACDC dataset
 =================================================
-**Source code:** `ACDC.py <https://github.com/ol-sen/medreaders/blob/master/ACDC.py>`_
-
---------------
+**Source code:** `ACDC.py <https://github.com/ol-sen/medreaders/blob/master/medreaders/ACDC.py>`_
 
 The :mod:`ACDC` module contains the code for reading ACDC dataset into memory and for auxiliary tasks:
     * resize images with their ground truth masks;
