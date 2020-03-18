@@ -25,3 +25,29 @@ pip3 install medreaders
 ## Documentation
 
 Documentation is available at https://medreaders.readthedocs.io
+
+## Project Structure
+```
+.
+├── docs
+│   ├── Makefile
+│   ├── conf.py
+│   ├── index.rst
+│   └── make.bat
+├── medreaders
+│   ├── ACDC.py
+│   └── __init__.py
+├── tests
+│   └── ACDC.py
+├── .gitignore
+├── LICENSE
+├── README.md
+├── requirements.txt
+└── setup.py
+
+3 directories, 12 files
+```
+
+## Code Contributors
+
+* Olga Senyukova olga.senyukova@graphics.cs.msu.ru
