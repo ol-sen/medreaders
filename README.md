@@ -48,6 +48,6 @@ Documentation is available at https://medreaders.readthedocs.io
 3 directories, 12 files
 ```
 
-## Code Contributors
+## Corresponding Author
 
 * Olga Senyukova olga.senyukova@graphics.cs.msu.ru
