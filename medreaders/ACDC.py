@@ -23,12 +23,36 @@ Simple usage example:
     images = ACDC.get_images()
     masks = ACDC.get_masks()
 
+By default this block of code produces no output to command prompt. In order to change logging level you should insert the following lines before the aforementioned block of code:
+
+.. code-block:: python
+
+    import logging
+    logging.basicConfig(level = logging.INFO)
+
+In this case the output would be:
+
+.. code-block:: bash
+
+    >>> ACDC.load("training/ACDC", "all", "ED")
+    INFO:root:Loading ACDC dataset...
+    INFO:root:ACDC dataset has been loaded successfully.
+    >>> ACDC.resize(216, 256)
+    INFO:root:Resizing images with masks...
+    INFO:root:The images with masks have been resized successfully to 216x256.
+    >>> ACDC.save("PatientImages", "PatientImagesWithMasks")
+    INFO:root:Saving images...
+    INFO:root:The images have been saved successfully to PatientImages directory.
+    INFO:root:The images with masks have been saved successfully to PatientImagesWithMasks directory.
+
+
 `One-hot encoding <https://en.wikipedia.org/wiki/One-hot>`_ is used for ground truth masks by default. If you don't want to use it, you can set :func:`identity` as encoder and decoder before using :func:`load` function:
 
 .. code-block:: python
     
     ACDC.set_encoder(ACDC.identity)
     ACDC.set_decoder(ACDC.identity)
+
 
 Functions
 ---------
