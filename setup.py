@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name = "medreaders",
-    version = "1.0.0",
+    version = "1.0.3",
     author = "Olga Senyukova",
     author_email = "olga.senyukova@graphics.cs.msu.ru",
     description = "Readers for medical imaging datasets",
@@ -14,7 +14,7 @@ setuptools.setup(
     url = "https://github.com/ol-sen/medreaders",
     packages = setuptools.find_packages(),
     classifiers = [
-        "Development Status :: 3 - Beta",
+        "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
         "Intended Audience :: Science/Research",
         "Intended Audience :: Healthcare Industry",
