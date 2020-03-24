@@ -10,7 +10,7 @@ In order to use this package you should download a dataset that you need from [G
 
 First time the focus will be on datasets for cardiac image segmentation problem.
 
-Currently the repository contains the code for reading [ACDC dataset](https://www.creatis.insa-lyon.fr/Challenge/acdc/index.html).
+Currently the package provides the means for working with [ACDC dataset](https://www.creatis.insa-lyon.fr/Challenge/acdc/index.html).
 
 ## Requirements
 
