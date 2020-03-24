@@ -14,8 +14,17 @@ setuptools.setup(
     url = "https://github.com/ol-sen/medreaders",
     packages = setuptools.find_packages(),
     classifiers = [
-        "Programming Language :: Python :: 3",
+        "Development Status :: 3 - Beta",
+        "Intended Audience :: Developers",
+        "Intended Audience :: Science/Research",
+        "Intended Audience :: Healthcare Industry",
         "License :: OSI Approved :: MIT License",
+        "Operating System :: Unix", 
+        "Programming Language :: Python :: 3",
+        "Topic :: Scientific/Engineering :: Artificial Intelligence",
+        "Topic :: Scientific/Engineering :: Image Recognition",
+        "Topic :: Scientific/Engineering :: Medical Science Apps.",
+        "Topic :: Software Development :: Libraries :: Python Modules"
     ],
     python_requires = '>=3.6',
     install_requires = [
