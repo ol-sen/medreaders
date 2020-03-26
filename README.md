@@ -14,7 +14,7 @@ Currently the package provides the means for working with [ACDC dataset](https:/
 
 ## Requirements
 
-* Python 3.6.x
+* Python>=3.5
 
 ## Installation
 

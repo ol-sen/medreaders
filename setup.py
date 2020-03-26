@@ -26,7 +26,7 @@ setuptools.setup(
         "Topic :: Scientific/Engineering :: Medical Science Apps.",
         "Topic :: Software Development :: Libraries :: Python Modules"
     ],
-    python_requires = '>=3.6',
+    python_requires = '>=3.5',
     install_requires = [
         "imageio==2.8.0",
         "matplotlib==3.1.3",
