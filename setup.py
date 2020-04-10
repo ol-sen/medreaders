@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name = "medreaders",
-    version = "1.0.1",
+    version = "1.0.4",
     author = "Olga Senyukova",
     author_email = "olga.senyukova@graphics.cs.msu.ru",
     description = "Readers for medical imaging datasets",
@@ -28,10 +28,10 @@ setuptools.setup(
     ],
     python_requires = '>=3.5',
     install_requires = [
-        "imageio==2.8.0",
-        "matplotlib==3.1.3",
-        "nibabel==3.0.1",
-        "numpy==1.18.1",
-        "scikit-image==0.16.2",
+        "imageio>=2.3.0",
+        "matplotlib>=2.0.0",
+        "nibabel>=2.4.0",
+        "numpy>=1.13.3",
+        "scikit-image>=0.15.0",
     ],
 )
