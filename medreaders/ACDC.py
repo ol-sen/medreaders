@@ -53,6 +53,11 @@ In this case the output would be:
     ACDC.set_encoder(ACDC.identity)
     ACDC.set_decoder(ACDC.identity)
 
+Default output image format is such that is used in `PyTorch <https://pytorch.org/>`_ library: [nslices, channels, height, width]. You can change format to `Keras <https://keras.io/>`_ style [nslices, height, width, channels]:
+
+.. code-block:: python
+    
+    ACDC.set_images_format("Keras")
 
 Functions
 ---------
@@ -79,6 +84,8 @@ class ACDC_Reader:
         super().__init__()
         self.encoder = one_hot_encode
         self.decoder = one_hot_decode
+        self.format = "PyTorch"
+        self.channels = 1
         self.images = []
         self.masks = []
 
@@ -86,7 +93,7 @@ class ACDC_Reader:
         """
         Sets the function for encoding of ground truth masks specified by *encode* parameter.
         
-        param function encode: encoding function 
+        :param function encode: encoding function 
         
         Example 1:
 
@@ -111,7 +118,7 @@ class ACDC_Reader:
         """
         Sets the function for decoding of encoded ground truth masks specified by *decode* parameter.
         
-        param function decode: decoding function 
+        :param function decode: decoding function 
         
         Example 1:
 
@@ -131,13 +138,42 @@ class ACDC_Reader:
             Encoder and decoder should be set simultaneously and should correspond to mutually inverse functions.
         """
         self.decoder = decode
+    
+    def set_images_format(self, fmt):
+        """
+        Sets the images format: PyTorch style [nslices, channels, height, width] or Keras style [nslices, height, width, channels]. PyTorch style is default. 
+        
+        :param str fmt: "PyTorch" or "Keras"  
+        :raises ValueError: if *fmt* parameter is incorrrect 
+        
+        Example 1:
+
+        .. code-block:: python   
+
+            custom_ACDC_Reader.set_images_format("Keras")
+        """
+        if fmt not in ["PyTorch", "Keras"]:
+            raise ValueError("Incorrect 'fmt' parameter in function 'set_images_format'. Expected values: 'PyTorch', 'Keras'.")
+        self.format = fmt
+   
+    def get_images_format(self):
+        """
+        Gets the images format: PyTorch style [nslices, channels, height, width] or Keras style [nslices, height, width, channels]. PyTorch style is default. 
+        
+        Example 1:
+
+        .. code-block:: python   
+
+            fmt = custom_ACDC_Reader.get_images_format()
+        """
+        return self.format
 
     def get_images(self):
         """
         Gets all patient images.
 
-        returns: a list of images
-        rtype: a list of numpy.ndarrays  
+        :returns: a list of images
+        :rtype: a list of numpy.ndarrays  
         
         Example:
 
@@ -151,8 +187,8 @@ class ACDC_Reader:
         """
         Gets ground truth masks for all patient images.
 
-        returns: a list of masks
-        rtype: a list of numpy.ndarrays  
+        :returns: a list of masks
+        :rtype: a list of numpy.ndarrays  
         
         Example:
 
@@ -162,7 +198,7 @@ class ACDC_Reader:
 
         """
         return self.masks
-
+        
     def load(self, data_dir, structure, phase):
         """
         Loads ACDC dataset into memory (the dataset can be downloaded from https://www.creatis.insa-lyon.fr/Challenge/acdc/index.html).
@@ -183,16 +219,17 @@ class ACDC_Reader:
             raise ValueError("Incorrect 'mask' parameter in function 'load'. Expected values: 'RV', 'MYO', 'LV', 'all'.")
         if phase not in ["ED", "ES", "both"]:
             raise ValueError("Incorrect 'phase' parameter in function 'load'. Expected values: 'ED', 'ES', 'both'.")
+        
         logging.info("Loading ACDC dataset...")
         glob_search = os.path.join(data_dir, "patient*")
         patient_dirs = sorted(glob.glob(glob_search))
         if len(patient_dirs) == 0:
             raise EnvironmentError("Loading ACDC failed. No patient directories were found in {}.".format(data_dir))
         del patient_dirs[1] # remove file patient001.Info.cfg from patient directories list
-        self.images = [f for i in patient_dirs for f in load_patient_images(i, phase)]
+        self.images = [f for i in patient_dirs for f in self._load_patient_images(i, phase)]
         self.masks = [f for i in patient_dirs for f in self._load_patient_masks(i, structure, phase)]
         logging.info("ACDC dataset has been loaded successfully.")
-         
+        
     def resize(self, new_height, new_width, interpolate = True):
         """
         Resizes images according with their ground truth masks to (new_height, new_width). If *interpolate* parameter is set to **True**, bilinear interpolation for images and nearest neighbor interpolation for masks is used. Otherwise central cropping and/or zero padding is used for images and masks.
@@ -218,14 +255,14 @@ class ACDC_Reader:
         """    
         logging.info("Resizing images with masks...")
         if interpolate == True:
-            self.images = [resize3D_image(new_height, new_width)(i)
+            self.images = [self._resize3D_image(new_height, new_width)(i)
                 for i in self.images] 
             self.masks = [self._resize3D_mask(new_height, new_width)(m)
                 for m in self.masks]
         else:
-            self.images = [fit_to_box(new_height, new_width)(i)
+            self.images = [self._fit_to_box(new_height, new_width)(i)
                 for i in self.images]
-            self.masks = [self.encoder(fit_to_box(new_height, new_width)(self.decoder(m)))
+            self.masks = [self.encoder(self._fit_to_box(new_height, new_width)(self.decoder(m)))
                 for m in self.masks]         
         logging.info("The images with masks have been resized successfully to {}x{}.".format(new_height, new_width))
     
@@ -253,10 +290,10 @@ class ACDC_Reader:
         logging.info("Saving images...")
         os.mkdir(save_dir_images)
         for image_ind, image in enumerate(self.images):
-            for slice_ind, slice_image in enumerate(normalize(slicing(image))):
+            for slice_ind, slice_image in enumerate(normalize(slicing_image(self._transpose_image_to_skimage(image)))):
                 imageio.imwrite(
                     os.path.join(save_dir_images, "image{:03d}_slice{:02d}.png".format(image_ind + 1, slice_ind + 1)),
-                    slice_image)
+                   slice_image[:, :, 0])
         logging.info("The images have been saved successfully to {} directory.".format(save_dir_images))
         
         def two_pictures_together_to_plot(image_slice, mask_slice):
@@ -272,23 +309,73 @@ class ACDC_Reader:
             plt.imshow(mask_slice, cmap = cmap_mask, alpha = alpha) 
         os.mkdir(save_dir_masks)
         for image_ind, (image, mask) in enumerate(zip(self.images, self.masks)):
-            for slice_ind, (image_slice, mask_slice) in enumerate(zip(slicing(image), slicing(self.decoder(mask)))):
-                two_pictures_together_to_plot(image_slice, mask_slice)
+            for slice_ind, (image_slice, mask_slice) in enumerate(zip(slicing_image(self._transpose_image_to_skimage(image)), slicing_mask(self.decoder(mask)))):
+                two_pictures_together_to_plot(image_slice[:, :, 0], mask_slice)
                 path = os.path.join(save_dir_masks, "image{:03d}_slice{:02d}.png".format(image_ind + 1, slice_ind + 1)) 
                 plt.savefig(path, bbox_inches = 'tight')
                 plt.close()    
         logging.info("The images with masks have been saved successfully to {} directory.".format(save_dir_masks))
+ 
+    def _reshape_image_to_format(self, image):
+        nslices, height, width = image.shape
+        if self.format == "PyTorch":
+            return image.reshape(nslices, self.channels, height, width)
+        else:
+            return image.reshape(nslices, height, width, self.channels) 
+    
+    def _load_patient_images(self, patient_dir, phase):
+        return ([self._reshape_image_to_format(load_nifti_image(f)) for f in get_frames_paths(patient_dir, phase, create_frame_filename_image)])
 
     def _load_patient_masks(self, patient_dir, structure, phase):
         return ([self.encoder(binarize_mask_if_one_structure(load_nifti_image(f), structure)) 
                 for f in get_frames_paths(patient_dir, phase, create_frame_filename_mask)])
+     
+    def _transpose_image_to_skimage(self, image):
+        if self.format == "PyTorch":
+            nslices, channels, height, width = image.shape
+            return np.transpose(image, [0, 2, 3, 1])
+        else:
+            return image 
+
+    def _transpose_image_from_skimage(self, image):
+        if self.format == "PyTorch":
+            nslices, height, width, channels = image.shape
+            return np.transpose(image, [0, 3, 1, 2])
+        else:
+            return image
+
+    @lru_cache()
+    def _resize3D_image(self, new_height, new_width):
+        return lambda item: self._transpose_image_from_skimage(combine3D_image(
+                map(truncate_int64,
+                map(resize2D_image(new_height, new_width),
+                slicing_image(self._transpose_image_to_skimage(item))))))
 
     @lru_cache()
     def _resize3D_mask(self, new_height, new_width):
-        return lambda item: self.encoder(combine3D(
+        return lambda item: self.encoder(combine3D_mask(
             map(truncate_int64,
             map(resize2D_mask(new_height, new_width),
-                slicing(self.decoder(item))))))
+                slicing_mask(self.decoder(item))))))
+
+    @lru_cache()
+    def _fit_to_box(self, new_height, new_width):
+        def internal(item):
+            if len(item.shape) == 4: # image
+                item = self._transpose_image_to_skimage(item)
+            if new_height < height(item):
+                item = crop_height(item, new_height)
+            if new_width < width(item):
+                item = crop_width(item, new_width)
+            if new_height > height(item):
+                item = pad_height(item, new_height)
+            if new_width > width(item):
+                item = pad_width(item, new_width)
+            if len(item.shape) == 4: # image
+                return self._transpose_image_from_skimage(item)
+            else: # mask
+                return item
+        return internal 
 
 
 def get_ACDC_reader(name):
@@ -363,6 +450,35 @@ def set_decoder(decode):
     """
 
     _default_ACDC_Reader.set_decoder(decode)
+
+
+def set_images_format(fmt):
+    """
+    Sets the images format: PyTorch style [n, channels, height, width] or Keras style [n, height, width, channels]. PyTorch style is default. 
+        
+    :param str fmt: "PyTorch" or "Keras"  
+    :raises ValueError: if *fmt* parameter is incorrrect 
+        
+    Example 1:
+
+    .. code-block:: python   
+
+        ACDC.set_images_format("Keras")
+    """
+    _default_ACDC_Reader.set_images_format(fmt)
+
+
+def get_images_format():
+    """
+    Gets the images format: PyTorch style [nslices, channels, height, width] or Keras style [nslices, height, width, channels]. PyTorch style is default. 
+        
+    Example 1:
+
+    .. code-block:: python   
+
+        fmt = ACDC.get_images_format()
+    """
+    return _default_ACDC_Reader.get_images_format()
 
 
 def load(data_dir, structure, phase):
@@ -531,31 +647,47 @@ def identity(mask):
 
 _default_ACDC_Reader = ACDC_Reader()
 
+# The following functions suppose that images and masks are in skimage (also Keras) format: [nslices, height, width, channels] for images and [nslices, height, width] for maske. 
 
 def height(item):
-    return item.shape[0]
-
-
-def width(item):
     return item.shape[1]
 
 
-def depth(item):
+def width(item):
     return item.shape[2]
 
 
-def slicing(item):
-    return (item[:, :, j] for j in range(depth(item)))
+def nslices(item):
+    return item.shape[0]
 
 
-def combine3D(generator):
+def slicing_image(item):
+    return (item[j, :, :, :] for j in range(nslices(item)))
+
+
+def slicing_mask(item):
+    return (item[j, :, :] for j in range(nslices(item)))
+
+
+def combine3D_image(generator):
+    slices = list(generator)
+    dtype = type(slices[0][0][0][0])
+    nslices = len(slices)
+    height, width, channels = slices[0].shape
+    new_item = np.zeros((nslices, height, width, channels), dtype = dtype)
+    for i in range(nslices):
+        new_item[i, :, :, :] = slices[i]
+    return new_item
+
+
+def combine3D_mask(generator):
     slices = list(generator)
     dtype = type(slices[0][0][0])
-    depth = len(slices)
+    nslices = len(slices)
     height, width = slices[0].shape
-    new_item = np.zeros((height, width, depth), dtype = dtype)
-    for i in range(depth):
-        new_item[:, :, i] = slices[i]
+    new_item = np.zeros((nslices, height, width), dtype = dtype)
+    for i in range(nslices):
+        new_item[i, :, :] = slices[i]
     return new_item
 
 
@@ -582,55 +714,44 @@ def resize2D_mask(new_height, new_width):
             anti_aliasing = False)
 
 
-@lru_cache()
-def resize3D_image(new_height, new_width):
-    return lambda item: combine3D(
-            map(truncate_int64,
-            map(resize2D_image(new_height, new_width),
-                slicing(item))))
-
-
 def crop_height(item, new_height):
     remove_y_top = (height(item) - new_height) // 2
-    remove_y_bottom = height(item) - new_height - remove_y_top;
-    return skimage.util.crop(item, ((remove_y_top, remove_y_bottom), (0, 0), (0, 0)))
-
+    remove_y_bottom = height(item) - new_height - remove_y_top
+    if len(item.shape) == 4: # image
+        return skimage.util.crop(item, ((0, 0), (remove_y_top, remove_y_bottom), (0, 0), (0, 0)))
+    else: # mask
+        return skimage.util.crop(item, ((0, 0), (remove_y_top, remove_y_bottom), (0, 0)))
+ 
 
 def crop_width(item, new_width):
     remove_x_left = (width(item) - new_width) // 2
-    remove_x_right = width(item) - new_width - remove_x_left;
-    return skimage.util.crop(item, ((0, 0), (remove_x_left, remove_x_right), (0, 0)))
+    remove_x_right = width(item) - new_width - remove_x_left 
+    if len(item.shape) == 4: # image     
+        return skimage.util.crop(item, ((0, 0), (0, 0), (remove_x_left, remove_x_right), (0, 0)))
+    else: # mask
+        return skimage.util.crop(item, ((0, 0), (0, 0), (remove_x_left, remove_x_right)))
 
 
 def pad_height(item, new_height):
     add_y_top = (new_height - height(item)) // 2
-    add_y_bottom = new_height - height(item) - add_y_top;
-    return skimage.util.pad(item, ((add_y_top, add_y_bottom), (0, 0), (0, 0)), 'minimum')
+    add_y_bottom = new_height - height(item) - add_y_top
+    if len(item.shape) == 4: # image 
+        return skimage.util.pad(item, ((0, 0), (add_y_top, add_y_bottom), (0, 0), (0, 0)), 'minimum')
+    else: # mask
+        return skimage.util.pad(item, ((0, 0), (add_y_top, add_y_bottom), (0, 0)), 'minimum')
 
 
 def pad_width(item, new_width):
     add_x_left = (new_width - width(item)) // 2
-    add_x_right = new_width - width(item) - add_x_left;
-    return skimage.util.pad(item, ((0, 0), (add_x_left, add_x_right), (0, 0)), 'minimum')
-
-
-@lru_cache()
-def fit_to_box(new_height, new_width):
-    def internal(item):
-        if new_height < height(item):
-            item = crop_height(item, new_height)
-        if new_width < width(item):
-            item = crop_width(item, new_width)
-        if new_height > height(item):
-            item = pad_height(item, new_height)
-        if new_width > width(item):
-            item = pad_width(item, new_width)
-        return item
-    return internal 
+    add_x_right = new_width - width(item) - add_x_left
+    if len(item.shape) == 4: # image 
+        return skimage.util.pad(item, ((0, 0), (0, 0), (add_x_left, add_x_right), (0, 0)), 'minimum')
+    else: # mask
+        return skimage.util.pad(item, ((0, 0), (0, 0), (add_x_left, add_x_right)), 'minimum')
 
 
 def normalize(slices):
-    return ((((s - s.min()) / (s.max() - s.min()) * 255).astype('uint8')) 
+    return (((s - s.min()) / (s.max() - s.min()) * 255).astype('uint8') 
             for s in slices)
 
 
@@ -665,11 +786,9 @@ def get_frames_paths(patient_dir, phase, create_frame_filename):
    
 
 def load_nifti_image(file_name):
-    return np.array(nib.load(file_name).get_fdata(), dtype = np.int64)
-
-
-def load_patient_images(patient_dir, phase):
-    return ([load_nifti_image(f) for f in get_frames_paths(patient_dir, phase, create_frame_filename_image)])
+    image = np.array(nib.load(file_name).get_fdata(), dtype = np.int64)
+    height, width, nslices = image.shape
+    return np.transpose(image, [2, 0, 1])
 
 
 def binarize_mask_if_one_structure(patient_mask, structure):
@@ -688,4 +807,3 @@ def binarize_mask_if_one_structure(patient_mask, structure):
     patient_mask[bg_elems] = 0
     
     return patient_mask
-
