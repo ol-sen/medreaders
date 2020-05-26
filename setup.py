@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name = "medreaders",
-    version = "1.0.4",
+    version = "1.0.5",
     author = "Olga Senyukova",
     author_email = "olga.senyukova@graphics.cs.msu.ru",
     description = "Readers for medical imaging datasets",
