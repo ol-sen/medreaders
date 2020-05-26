@@ -454,7 +454,7 @@ def set_decoder(decode):
 
 def set_images_format(fmt):
     """
-    Sets the images format: PyTorch style [n, channels, height, width] or Keras style [n, height, width, channels]. PyTorch style is default. 
+    Sets the images format: PyTorch style [nslices, channels, height, width] or Keras style [nslices, height, width, channels]. PyTorch style is default. 
         
     :param str fmt: "PyTorch" or "Keras"  
     :raises ValueError: if *fmt* parameter is incorrrect 
