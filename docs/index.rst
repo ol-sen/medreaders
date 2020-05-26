@@ -24,6 +24,8 @@ Currently the package provides the means for working with `ACDC dataset <https:/
              get_masks,
              set_encoder,
              set_decoder,
+             set_images_format,
+             get_images_format,
              one_hot_encode,
              one_hot_decode,
              identity
