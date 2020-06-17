@@ -18,7 +18,8 @@ Simple usage example:
     import medreaders
     from medreaders import ACDC
     ACDC.load("ACDC/training", "all", "ED")        
-    ACDC.resize(216, 256) 
+    ACDC.resize(216, 256)
+    ACDC.normalize()
     ACDC.save("PatientImages", "PatientImagesWithMasks")
     images = ACDC.get_images()
     masks = ACDC.get_masks()
@@ -266,6 +267,22 @@ class ACDC_Reader:
                 for m in self.masks]         
         logging.info("The images with masks have been resized successfully to {}x{}.".format(new_height, new_width))
     
+    def normalize(self):
+        """
+        Normalizes images intensity to the range [0, 255].
+            
+        Example 1:
+
+        .. code-block:: python
+            
+            custom_ACDC_Reader.normalize() 
+        """
+
+        self.images = [self._transpose_from_skimage(combine3D(
+                            normalize_image(slicing(
+                                self._transpose_to_skimage(i)))))
+            for i in self.images]
+
     def save(self, save_dir_images, save_dir_masks, alpha = 0.5):
         """
         Saves original images slice by slice in PNG format to *save_dir_images*. Saves pairs of images and these images overlayed by ground truth masks slice by slice in PNG format to *save_dir_masks*.
@@ -290,7 +307,7 @@ class ACDC_Reader:
         logging.info("Saving images...")
         os.mkdir(save_dir_images)
         for image_ind, image in enumerate(self.images):
-            for slice_ind, slice_image in enumerate(normalize(slicing_image(self._transpose_image_to_skimage(image)))):
+            for slice_ind, slice_image in enumerate(normalize_image(slicing(self._transpose_to_skimage(image)))):
                 imageio.imwrite(
                     os.path.join(save_dir_images, "image{:03d}_slice{:02d}.png".format(image_ind + 1, slice_ind + 1)),
                    slice_image[:, :, 0])
@@ -309,60 +326,58 @@ class ACDC_Reader:
             plt.imshow(mask_slice, cmap = cmap_mask, alpha = alpha) 
         os.mkdir(save_dir_masks)
         for image_ind, (image, mask) in enumerate(zip(self.images, self.masks)):
-            for slice_ind, (image_slice, mask_slice) in enumerate(zip(slicing_image(self._transpose_image_to_skimage(image)), slicing_mask(self.decoder(mask)))):
-                two_pictures_together_to_plot(image_slice[:, :, 0], mask_slice)
+            for slice_ind, (image_slice, mask_slice) in enumerate(zip(slicing(self._transpose_to_skimage(image)), slicing(self._transpose_to_skimage(self.decoder(mask))))):
+                two_pictures_together_to_plot(image_slice[:, :, 0], mask_slice[:, :, 0])
                 path = os.path.join(save_dir_masks, "image{:03d}_slice{:02d}.png".format(image_ind + 1, slice_ind + 1)) 
                 plt.savefig(path, bbox_inches = 'tight')
                 plt.close()    
         logging.info("The images with masks have been saved successfully to {} directory.".format(save_dir_masks))
  
-    def _reshape_image_to_format(self, image):
-        nslices, height, width = image.shape
+    def _reshape_to_format(self, item):
+        nslices, height, width = item.shape
         if self.format == "PyTorch":
-            return image.reshape(nslices, self.channels, height, width)
+            return item.reshape(nslices, self.channels, height, width)
         else:
-            return image.reshape(nslices, height, width, self.channels) 
+            return item.reshape(nslices, height, width, self.channels) 
     
     def _load_patient_images(self, patient_dir, phase):
-        return ([self._reshape_image_to_format(load_nifti_image(f)) for f in get_frames_paths(patient_dir, phase, create_frame_filename_image)])
+        return ([self._reshape_to_format(load_nifti_image(f)) for f in get_frames_paths(patient_dir, phase, create_frame_filename_image)])
 
     def _load_patient_masks(self, patient_dir, structure, phase):
-        return ([self.encoder(binarize_mask_if_one_structure(load_nifti_image(f), structure)) 
+        return ([self.encoder(self._reshape_to_format(binarize_mask_if_one_structure(load_nifti_image(f), structure))) 
                 for f in get_frames_paths(patient_dir, phase, create_frame_filename_mask)])
      
-    def _transpose_image_to_skimage(self, image):
+    def _transpose_to_skimage(self, item):
         if self.format == "PyTorch":
-            nslices, channels, height, width = image.shape
-            return np.transpose(image, [0, 2, 3, 1])
+            return np.transpose(item, [0, 2, 3, 1])
         else:
-            return image 
+            return item 
 
-    def _transpose_image_from_skimage(self, image):
+    def _transpose_from_skimage(self, item):
         if self.format == "PyTorch":
-            nslices, height, width, channels = image.shape
-            return np.transpose(image, [0, 3, 1, 2])
+            return np.transpose(item, [0, 3, 1, 2])
         else:
-            return image
+            return item
 
     @lru_cache()
     def _resize3D_image(self, new_height, new_width):
-        return lambda item: self._transpose_image_from_skimage(combine3D_image(
+        return lambda item: self._transpose_from_skimage(combine3D(
                 map(truncate_int64,
                 map(resize2D_image(new_height, new_width),
-                slicing_image(self._transpose_image_to_skimage(item))))))
+                slicing(self._transpose_to_skimage(item))))))
 
     @lru_cache()
     def _resize3D_mask(self, new_height, new_width):
-        return lambda item: self.encoder(combine3D_mask(
+        return lambda item: self.encoder(self._transpose_from_skimage(
+            combine3D(
             map(truncate_int64,
             map(resize2D_mask(new_height, new_width),
-                slicing_mask(self.decoder(item))))))
+                slicing(self._transpose_to_skimage(self.decoder(item))))))))
 
     @lru_cache()
     def _fit_to_box(self, new_height, new_width):
         def internal(item):
-            if len(item.shape) == 4: # image
-                item = self._transpose_image_to_skimage(item)
+            item = self._transpose_to_skimage(item)
             if new_height < height(item):
                 item = crop_height(item, new_height)
             if new_width < width(item):
@@ -371,10 +386,7 @@ class ACDC_Reader:
                 item = pad_height(item, new_height)
             if new_width > width(item):
                 item = pad_width(item, new_width)
-            if len(item.shape) == 4: # image
-                return self._transpose_image_from_skimage(item)
-            else: # mask
-                return item
+            return self._transpose_from_skimage(item)
         return internal 
 
 
@@ -526,6 +538,19 @@ def resize(new_height, new_width, interpolate = True):
     return _default_ACDC_Reader.resize(new_height, new_width, interpolate)
 
 
+def normalize():
+    """
+    Normalizes images intensity to the range [0, 255].
+            
+    Example 1:
+
+    .. code-block:: python
+            
+        ACDC.normalize() 
+    """
+    return _default_ACDC_Reader.normalize()
+
+
 def save(save_dir_images, save_dir_masks, alpha = 0.5):
     """
     Saves original images slice by slice in PNG format to *save_dir_images*. Saves pairs of images and these images overlayed by ground truth masks slice by slice in PNG format to *save_dir_masks*.
@@ -661,15 +686,11 @@ def nslices(item):
     return item.shape[0]
 
 
-def slicing_image(item):
+def slicing(item):
     return (item[j, :, :, :] for j in range(nslices(item)))
 
 
-def slicing_mask(item):
-    return (item[j, :, :] for j in range(nslices(item)))
-
-
-def combine3D_image(generator):
+def combine3D(generator):
     slices = list(generator)
     dtype = type(slices[0][0][0][0])
     nslices = len(slices)
@@ -677,17 +698,6 @@ def combine3D_image(generator):
     new_item = np.zeros((nslices, height, width, channels), dtype = dtype)
     for i in range(nslices):
         new_item[i, :, :, :] = slices[i]
-    return new_item
-
-
-def combine3D_mask(generator):
-    slices = list(generator)
-    dtype = type(slices[0][0][0])
-    nslices = len(slices)
-    height, width = slices[0].shape
-    new_item = np.zeros((nslices, height, width), dtype = dtype)
-    for i in range(nslices):
-        new_item[i, :, :] = slices[i]
     return new_item
 
 
@@ -717,40 +727,28 @@ def resize2D_mask(new_height, new_width):
 def crop_height(item, new_height):
     remove_y_top = (height(item) - new_height) // 2
     remove_y_bottom = height(item) - new_height - remove_y_top
-    if len(item.shape) == 4: # image
-        return skimage.util.crop(item, ((0, 0), (remove_y_top, remove_y_bottom), (0, 0), (0, 0)))
-    else: # mask
-        return skimage.util.crop(item, ((0, 0), (remove_y_top, remove_y_bottom), (0, 0)))
+    return skimage.util.crop(item, ((0, 0), (remove_y_top, remove_y_bottom), (0, 0), (0, 0)))
  
 
 def crop_width(item, new_width):
     remove_x_left = (width(item) - new_width) // 2
     remove_x_right = width(item) - new_width - remove_x_left 
-    if len(item.shape) == 4: # image     
-        return skimage.util.crop(item, ((0, 0), (0, 0), (remove_x_left, remove_x_right), (0, 0)))
-    else: # mask
-        return skimage.util.crop(item, ((0, 0), (0, 0), (remove_x_left, remove_x_right)))
+    return skimage.util.crop(item, ((0, 0), (0, 0), (remove_x_left, remove_x_right), (0, 0)))
 
 
 def pad_height(item, new_height):
     add_y_top = (new_height - height(item)) // 2
     add_y_bottom = new_height - height(item) - add_y_top
-    if len(item.shape) == 4: # image 
-        return skimage.util.pad(item, ((0, 0), (add_y_top, add_y_bottom), (0, 0), (0, 0)), 'minimum')
-    else: # mask
-        return skimage.util.pad(item, ((0, 0), (add_y_top, add_y_bottom), (0, 0)), 'minimum')
+    return skimage.util.pad(item, ((0, 0), (add_y_top, add_y_bottom), (0, 0), (0, 0)), 'minimum')
 
 
 def pad_width(item, new_width):
     add_x_left = (new_width - width(item)) // 2
     add_x_right = new_width - width(item) - add_x_left
-    if len(item.shape) == 4: # image 
-        return skimage.util.pad(item, ((0, 0), (0, 0), (add_x_left, add_x_right), (0, 0)), 'minimum')
-    else: # mask
-        return skimage.util.pad(item, ((0, 0), (0, 0), (add_x_left, add_x_right)), 'minimum')
+    return skimage.util.pad(item, ((0, 0), (0, 0), (add_x_left, add_x_right), (0, 0)), 'minimum')
 
 
-def normalize(slices):
+def normalize_image(slices):
     return (((s - s.min()) / (s.max() - s.min()) * 255).astype('uint8') 
             for s in slices)
 
