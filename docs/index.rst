@@ -18,7 +18,8 @@ Currently the package provides the means for working with `ACDC dataset <https:/
    :caption: Contents:
 .. automodule:: ACDC
    :members: load,
-             resize, 
+             resize,
+             normalize, 
              save,
              get_images,
              get_masks,
