@@ -14,7 +14,7 @@ class TestAll(unittest.TestCase):
         ACDC.load("../../datasets_samples/ACDC", "all", "ED")        
         ACDC.resize(216, 256)
         ACDC.normalize()
-        ACDC.save("results/PatientImages", "results/PatientImagesWithMasks")
+        ACDC.save(images = "results/Images", masks = "results/Masks", both = "results/Both")
         images = ACDC.get_images()
         masks = ACDC.get_masks()
         assert len(images) == 2
@@ -33,7 +33,7 @@ class TestSetEncoderDecoder(unittest.TestCase):
         ACDC.set_decoder(ACDC.one_hot_decode)
         ACDC.load("../../datasets_samples/ACDC", "all", "ED")        
         ACDC.resize(216, 256) 
-        ACDC.save("results/PatientImagesOneHot", "results/PatientImagesWithMasksOneHot")
+        ACDC.save(images = "results/ImagesOneHot", masks = "results/MasksOneHot", both = "results/BothOneHot")
         images = ACDC.get_images()
         masks = ACDC.get_masks()
         assert len(images) == 2
@@ -46,7 +46,7 @@ class TestSetEncoderDecoder(unittest.TestCase):
         ACDC.set_decoder(ACDC.identity)
         ACDC.load("../../datasets_samples/ACDC", "all", "ED")        
         ACDC.resize(216, 256) 
-        ACDC.save("results/PatientImagesIdentity", "results/PatientImagesWithMasksIdentity")
+        ACDC.save(images = "results/ImagesIdentity", masks = "results/MasksIdentity")
         images = ACDC.get_images()
         masks = ACDC.get_masks()
         assert len(images) == 2
@@ -68,7 +68,7 @@ class TestSetImagesFormat(unittest.TestCase):
         ACDC.set_images_format("PyTorch")
         ACDC.load("../../datasets_samples/ACDC", "all", "ED")        
         ACDC.resize(300, 300) 
-        ACDC.save("results/PatientImagesPyTorch", "results/PatientImagesWithMasksPyTorch")
+        ACDC.save(images = "results/ImagesPyTorch", masks = "results/MasksPyTorch", both = "results/BothPyTorch")
         images = ACDC.get_images()
         masks = ACDC.get_masks()
         assert len(images) == 2
@@ -80,7 +80,7 @@ class TestSetImagesFormat(unittest.TestCase):
         ACDC.set_images_format("Keras")
         ACDC.load("../../datasets_samples/ACDC", "all", "ED")        
         ACDC.resize(300, 300) 
-        ACDC.save("results/PatientImagesKeras", "results/PatientImagesWithMasksKeras")
+        ACDC.save(images = "results/ImagesKeras", masks = "results/MasksKeras", both = "results/BothKeras")
         images = ACDC.get_images()
         masks = ACDC.get_masks()
         assert len(images) == 2
@@ -128,7 +128,7 @@ class TestACDCReaderResize(unittest.TestCase):
     
     def test_300x300_interpolate(self):
         ACDC._default_ACDC_Reader.resize(300, 300)
-        ACDC._default_ACDC_Reader.save("results/Images300x300Interp", "results/Masks300x300Interp")
+        ACDC._default_ACDC_Reader.save(images = "results/Images300x300Interp", masks = "results/Masks300x300Interp")
         images = ACDC._default_ACDC_Reader.get_images()
         masks = ACDC._default_ACDC_Reader.get_masks()
         fmt = ACDC._default_ACDC_Reader.get_images_format()
@@ -137,7 +137,7 @@ class TestACDCReaderResize(unittest.TestCase):
 
     def test_300x300_no_interpolate(self):
         ACDC._default_ACDC_Reader.resize(300, 300, interpolate = False)
-        ACDC._default_ACDC_Reader.save("results/Images300x300NoInterp", "results/Masks300x300NoInterp")
+        ACDC._default_ACDC_Reader.save(images = "results/Images300x300NoInterp", masks = "results/Masks300x300NoInterp")
         images = ACDC._default_ACDC_Reader.get_images()
         masks = ACDC._default_ACDC_Reader.get_masks()
         fmt = ACDC._default_ACDC_Reader.get_images_format()
@@ -146,7 +146,7 @@ class TestACDCReaderResize(unittest.TestCase):
 
     def test_100x100_interpolate(self):
         ACDC._default_ACDC_Reader.resize(100, 100)
-        ACDC._default_ACDC_Reader.save("results/Images100x100Interp", "results/Masks100x100Interp")
+        ACDC._default_ACDC_Reader.save(images = "results/Images100x100Interp", masks = "results/Masks100x100Interp")
         images = ACDC._default_ACDC_Reader.get_images()
         masks = ACDC._default_ACDC_Reader.get_masks()
         fmt = ACDC._default_ACDC_Reader.get_images_format()
@@ -155,7 +155,7 @@ class TestACDCReaderResize(unittest.TestCase):
 
     def test_100x100_no_interpolate(self):
         ACDC._default_ACDC_Reader.resize(100, 100, interpolate = False)
-        ACDC._default_ACDC_Reader.save("results/Images100x100NoInterp", "results/Masks100x100NoInterp")
+        ACDC._default_ACDC_Reader.save(images = "results/Images100x100NoInterp", masks = "results/Masks100x100NoInterp")
         images = ACDC._default_ACDC_Reader.get_images()
         masks = ACDC._default_ACDC_Reader.get_masks()
         fmt = ACDC._default_ACDC_Reader.get_images_format()
@@ -176,12 +176,28 @@ class TestACDCReaderSave(unittest.TestCase):
         ACDC._default_ACDC_Reader.load("../../datasets_samples/ACDC", "all", "ED")
         if not os.path.isdir("results"):
             os.mkdir("results")
-
+    
     def test_default(self):
-        ACDC._default_ACDC_Reader.save("results/ImagesAlphaDefault", "results/MasksAlphaDefault")    
+        ACDC._default_ACDC_Reader.save(images = "results/ImagesDefault", masks = "results/MasksDefault", both = "results/BothDefault")
+    
+    def test_save_images_only(self):
+        ACDC._default_ACDC_Reader.load("../../datasets_samples/ACDC", "all", "ED")        
+        ACDC._default_ACDC_Reader.save(images = "results/ImagesOnly")
 
+    def test_save_masks_only(self):
+        ACDC._default_ACDC_Reader.load("../../datasets_samples/ACDC", "all", "ED")        
+        ACDC._default_ACDC_Reader.save(masks = "results/MasksOnly")
+
+    def test_save_both_only(self):
+        ACDC._default_ACDC_Reader.load("../../datasets_samples/ACDC", "all", "ED")        
+        ACDC._default_ACDC_Reader.save(both = "results/BothOnly")
+    
+    def test_save_none(self):
+        ACDC._default_ACDC_Reader.load("../../datasets_samples/ACDC", "all", "ED")        
+        ACDC._default_ACDC_Reader.save()
+    
     def test_default_alpha_1(self):
-        ACDC._default_ACDC_Reader.save("results/ImagesAlpha1", "results/MasksAlpha1", alpha = 1) 
+        ACDC._default_ACDC_Reader.save(both = "results/BothAlpha1", alpha = 1) 
 
 
 class TestACDCReaderReshapeToFormat(unittest.TestCase):
@@ -419,7 +435,7 @@ class TestSave(unittest.TestCase):
         ACDC.load("../../datasets_samples/ACDC", "all", "ED")
         if not os.path.isdir("results"):
             os.mkdir("results")
-        ACDC.save("results/ImagesAlphaDefault_2", "results/MasksAlphaDefault_2")    
+        ACDC.save(images = "results/Images_1", masks = "results/Masks_1", both = "results/Both_1")    
 
 class TestOneHotEncode(unittest.TestCase):
     def test_012x210(self):

@@ -1,4 +1,4 @@
-# Copyright (c) 2020 Olga Senyukova. All rights reserved.
+# Copyright (c) 2020-2021 Olga Senyukova. All rights reserved.
 # License: http://opensource.org/licenses/MIT
 """
 ACDC --- Reader for ACDC dataset
@@ -20,7 +20,7 @@ Simple usage example:
     ACDC.load("ACDC/training", "all", "ED")        
     ACDC.resize(216, 256)
     ACDC.normalize()
-    ACDC.save("PatientImages", "PatientImagesWithMasks")
+    ACDC.save(images = "PatientImages", masks = "PatientMasks", both = "PatientImagesWithMasks")
     images = ACDC.get_images()
     masks = ACDC.get_masks()
 
@@ -39,11 +39,12 @@ In this case the output would be:
     INFO:root:Loading ACDC dataset...
     INFO:root:ACDC dataset has been loaded successfully.
     >>> ACDC.resize(216, 256)
-    INFO:root:Resizing images with masks...
-    INFO:root:The images with masks have been resized successfully to 216x256.
-    >>> ACDC.save("PatientImages", "PatientImagesWithMasks")
-    INFO:root:Saving images...
+    INFO:root:Resizing...
+    INFO:root:The images and masks have been resized successfully to 216x256.
+    >>> ACDC.save(images = "PatientImages", masks = "PatientMasks", both = "PatientImagesWithMasks")
+    INFO:root:Saving...
     INFO:root:The images have been saved successfully to PatientImages directory.
+    INFO:root:The masks have been saved successfully to PatientMasks directory.
     INFO:root:The images with masks have been saved successfully to PatientImagesWithMasks directory.
 
 
@@ -69,14 +70,14 @@ import glob
 import numpy as np
 import nibabel as nib
 import imageio
-import matplotlib.pyplot as plt
+import matplotlib
+#import matplotlib.pyplot as plt
 import sys
 import logging
 import skimage.transform
 
-
+from matplotlib import pyplot as plt
 from functools import lru_cache
-
 
 _acdc_readers = {}
 
@@ -283,12 +284,13 @@ class ACDC_Reader:
                                 self._transpose_to_skimage(i)))))
             for i in self.images]
 
-    def save(self, save_dir_images, save_dir_masks, alpha = 0.5):
+    def save(self, images = None, masks = None, both = None, alpha = 0.5):
         """
-        Saves original images slice by slice in PNG format to *save_dir_images*. Saves pairs of images and these images overlayed by ground truth masks slice by slice in PNG format to *save_dir_masks*.
+        Saves original images slice by slice in PNG format to *images* directory. Saves ground truth masks slice by slice in PNG format to *masks* directory. Saves pairs of images and these images overlayed by ground truth masks slice by slice in PNG format to *both* directory.
         
-        :param str save_dir_images: path to the directory for saving original images
-        :param str save_dir_masks: path to the directory for saving images with masks
+        :param str images: path to the directory for saving original images
+        :param str masks: path to the directory for saving masks
+        :param str both: path to the directory for saving images with masks
         :param alpha: the alpha blending value for mask overlay, between 0 (transparent) and 1 (opaque)
         :type alpha: float
         
@@ -296,43 +298,71 @@ class ACDC_Reader:
 
         .. code-block:: python
             
-            custom_ACDC_Reader.save("PatientImages", "PatientImagesWithMasks")
+            custom_ACDC_Reader.save(images = "PatientImages", masks = "PatientMasks")
         
         Example 2:
 
         .. code-block:: python
             
-            custom_ACDC_Reader.save("PatientImages", "PatientImagesWithMasks", alpha = 0.2)
+            custom_ACDC_Reader.save(both = "PatientImagesWithMasks", alpha = 0.2)
 """   
-        logging.info("Saving images...")
-        os.mkdir(save_dir_images)
-        for image_ind, image in enumerate(self.images):
-            for slice_ind, slice_image in enumerate(normalize_image(slicing(self._transpose_to_skimage(image)))):
-                imageio.imwrite(
-                    os.path.join(save_dir_images, "image{:03d}_slice{:02d}.png".format(image_ind + 1, slice_ind + 1)),
-                   slice_image[:, :, 0])
-        logging.info("The images have been saved successfully to {} directory.".format(save_dir_images))
+        if images is None and masks is None and both is None:
+            logging.info("No save directories specified.")
+            return
+
+        logging.info("Saving...")
         
-        def two_pictures_together_to_plot(image_slice, mask_slice):
-            cmap_image = plt.cm.gray
-            cmap_mask = plt.cm.Set1
-            plt.figure(figsize = (8, 3.75))
-            plt.subplot(1, 2, 1)
-            plt.axis("off")
-            plt.imshow(image_slice, cmap = cmap_image)
-            plt.subplot(1, 2, 2)
-            plt.axis("off")
-            plt.imshow(image_slice, cmap = cmap_image)
-            plt.imshow(mask_slice, cmap = cmap_mask, alpha = alpha) 
-        os.mkdir(save_dir_masks)
-        for image_ind, (image, mask) in enumerate(zip(self.images, self.masks)):
-            for slice_ind, (image_slice, mask_slice) in enumerate(zip(slicing(self._transpose_to_skimage(image)), slicing(self._transpose_to_skimage(self.decoder(mask))))):
-                two_pictures_together_to_plot(image_slice[:, :, 0], mask_slice[:, :, 0])
-                path = os.path.join(save_dir_masks, "image{:03d}_slice{:02d}.png".format(image_ind + 1, slice_ind + 1)) 
-                plt.savefig(path, bbox_inches = 'tight')
-                plt.close()    
-        logging.info("The images with masks have been saved successfully to {} directory.".format(save_dir_masks))
- 
+        if images is not None:
+            os.mkdir(images)
+            for image_ind, image in enumerate(self.images):
+                for slice_ind, image_slice in enumerate(normalize_image(slicing(self._transpose_to_skimage(image)))):
+                    imageio.imwrite(
+                        os.path.join(images, "image{:03d}_slice{:02d}.png".format(image_ind + 1, slice_ind + 1)),
+                        image_slice[:, :, 0])
+            logging.info("The images have been saved successfully to {} directory.".format(images)) 
+        
+        if masks is not None:
+            os.mkdir(masks)
+            def display_image_in_actual_size(mask_slice):
+                dpi = matplotlib.rcParams['figure.dpi']
+                height, width = mask_slice.shape
+                figsize = width / dpi, height / dpi
+                fig = plt.figure(figsize = figsize)
+                axes = fig.add_axes([0, 0, 1, 1])
+                axes.axis('off')
+                axes.imshow(mask_slice, cmap = plt.cm.Set1)
+                plt.show()
+            
+            for mask_ind, mask in enumerate(self.masks):
+                for slice_ind, mask_slice in enumerate(slicing(self._transpose_to_skimage(self.decoder(mask)))):
+                    display_image_in_actual_size(mask_slice[:, :, 0])
+                    path = os.path.join(masks, "image{:03d}_slice{:02d}.png".format(mask_ind + 1, slice_ind + 1)) 
+                    plt.savefig(path)
+                    plt.close()    
+            logging.info("The masks have been saved successfully to {} directory.".format(masks))
+
+        if both is not None:
+            os.mkdir(both)
+            def two_pictures_together_to_plot(image_slice, mask_slice):
+                cmap_image = plt.cm.gray
+                cmap_mask = plt.cm.Set1
+                plt.figure(figsize = (8, 3.75))
+                plt.subplot(1, 2, 1)
+                plt.axis("off")
+                plt.imshow(image_slice, cmap = cmap_image)
+                plt.subplot(1, 2, 2)
+                plt.axis("off")
+                plt.imshow(image_slice, cmap = cmap_image)
+                plt.imshow(mask_slice, cmap = cmap_mask, alpha = alpha) 
+            
+            for image_ind, (image, mask) in enumerate(zip(self.images, self.masks)):
+                for slice_ind, (image_slice, mask_slice) in enumerate(zip(slicing(self._transpose_to_skimage(image)), slicing(self._transpose_to_skimage(self.decoder(mask))))):
+                    two_pictures_together_to_plot(image_slice[:, :, 0], mask_slice[:, :, 0])
+                    path = os.path.join(both, "image{:03d}_slice{:02d}.png".format(image_ind + 1, slice_ind + 1)) 
+                    plt.savefig(path, bbox_inches = 'tight')
+                    plt.close()    
+            logging.info("The images with masks have been saved successfully to {} directory.".format(both))
+
     def _reshape_to_format(self, item):
         nslices, height, width = item.shape
         if self.format == "PyTorch":
@@ -341,7 +371,7 @@ class ACDC_Reader:
             return item.reshape(nslices, height, width, self.channels) 
     
     def _load_patient_images(self, patient_dir, phase):
-        return ([self._reshape_to_format(load_nifti_image(f)) for f in get_frames_paths(patient_dir, phase, create_frame_filename_image)])
+        return ([self._reshape_to_format(load_nifti_image(f)) for f in get_frames_paths(patient_dir, phase, create_frame_filename_image)])    
 
     def _load_patient_masks(self, patient_dir, structure, phase):
         return ([self.encoder(self._reshape_to_format(binarize_mask_if_one_structure(load_nifti_image(f), structure))) 
@@ -551,12 +581,13 @@ def normalize():
     return _default_ACDC_Reader.normalize()
 
 
-def save(save_dir_images, save_dir_masks, alpha = 0.5):
+def save(images = None, masks = None, both = None, alpha = 0.5):
     """
-    Saves original images slice by slice in PNG format to *save_dir_images*. Saves pairs of images and these images overlayed by ground truth masks slice by slice in PNG format to *save_dir_masks*.
+    Saves original images slice by slice in PNG format to *images* directory. Saves ground truth masks slice by slice in PNG format to *masks* directory. Saves pairs of images and these images overlayed by ground truth masks slice by slice in PNG format to *both* directory.
         
-    :param str save_dir_images: path to the directory for saving original images
-    :param str save_dir_masks: path to the directory for saving images with masks
+    :param str images: path to the directory for saving original images
+    :param str masks: path to the directory for saving masks
+    :param str both: path to the directory for saving images with masks
     :param alpha: the alpha blending value for mask overlay, between 0 (transparent) and 1 (opaque)
     :type alpha: float
         
@@ -564,15 +595,15 @@ def save(save_dir_images, save_dir_masks, alpha = 0.5):
 
     .. code-block:: python
             
-        ACDC.save("PatientImagesOriginal", "PatientImagesWithMasks")
+        ACDC.save(images = "PatientImages", masks = "PatientMasks")
         
     Example 2:
 
     .. code-block:: python
             
-        ACDC.save("PatientImagesOriginal", "PatientImagesWithMasks", alpha = 0.2)
-"""   
-    return _default_ACDC_Reader.save(save_dir_images, save_dir_masks, alpha)
+        ACDC.save(both = "PatientImagesWithMasks", alpha = 0.2)
+"""
+    return _default_ACDC_Reader.save(images, masks, both, alpha)
 
 
 def get_images():
